@@ -40,7 +40,7 @@ flatpak-builder --user --install-deps-from=flathub --repo=repo build/flatpak io.
 
 The initial repository uses public-key fingerprint `03B3FEDB63A63601DBA151349836F000D7922580`. Keep its private key backed up securely outside Git. Losing it prevents seamless updates using the existing trust identity. Do not generate a new key for each release or publish a private key.
 
-Before releasing, update the Python version and MetaInfo release, capture screenshots if the UI changed, and pin screenshot URLs to a release tag. Run the checks below, commit the source, and push the tag before validating URLs.
+Before releasing, update the Python version and MetaInfo release, capture screenshots if the UI changed, and pin screenshot URLs to a published commit. Run the checks below, commit the source, and push the referenced commit before validating URLs.
 
 For the initial publisher, the dedicated key directory is `~/.local/share/victus-fan-control-release-keys`. The directory is private and is not part of the repository. Build with:
 

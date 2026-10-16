@@ -29,6 +29,20 @@ Changing the license string or claiming success from XML inspection does not fix
 
 ## Published installer
 
+Verified on 2026-10-16 using the public Pages repository and GNOME Software 50.4. Actual reference-import output includes:
+
+```text
+quirk:               local-has-repository
+name:                Fan Control
+version:             1.0.2
+license:             MIT
+license-is-free:     yes
+size-download:       262.6 kB
+size-installed:      312.3 kB
+```
+
+The same consumer result includes a cached app icon, the full description, two screenshot URLs, and the public homepage. Both screenshot URLs and the homepage return HTTP 200. GNOME Software's text diagnostic prints only the homepage URL, while the repository metadata includes homepage, source, and issue-tracker links. An isolated temporary Flatpak installation verified the signed remote and catalog. No application was installed.
+
 The signed repository and `.flatpakref` are now the primary distribution. They supply the remote catalog, MIT license, hosted screenshots, project links, sizes, and application updates through GNOME Software's full reference-import path. Run `packaging/check_software_page.py dist/fan-control.flatpakref` against the published repository to verify the consumer result.
 
 The separate `.flatpak` remains useful for offline transfer but can still show incomplete details in GNOME Software 50.4. Use the reference when viewing the complete installer listing.

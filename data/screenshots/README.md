@@ -16,4 +16,4 @@ Regenerate from the project root on a GNOME desktop:
 
 The images are included in the Flatpak under `/app/share/victus-fan-control/data/screenshots/` for distribution with the app. Flatpak bundles embed installer icons and AppStream XML, but do not embed a software-center screenshot gallery. Software centers load screenshot image URLs from AppStream. Copying PNG files into the bundle does not make them visible before installation.
 
-The MetaInfo references the images at tag-pinned HTTPS URLs in the public GitHub repository. When replacing screenshots, update the pinned tag and dimensions in `data/io.github.sh7vansh.VictusFanControl.metainfo.xml` and `packaging/site/index.html`, then publish that tag before validating the installer. The catalog composer preserves screenshot metadata.
+The MetaInfo references the images at commit-pinned HTTPS URLs in the public GitHub repository. When replacing screenshots, update the pinned commit and dimensions in `data/io.github.sh7vansh.VictusFanControl.metainfo.xml` and `packaging/site/index.html`, then push that commit before validating the installer. The catalog composer preserves screenshot metadata.
