@@ -17,7 +17,7 @@
       <li>See live CPU and GPU fan speeds, updated every second</li>
       <li>Follow your desktop's light or dark appearance</li>
     </ul>
-    <p>Changes require administrator authentication. Max fan speed stays active
+    <p>Authenticate once per app session to change settings. Use Lock Fan Controls in the menu to require authentication again. Max fan speed stays active
     when you close the app; turn it off to restore automatic cooling.</p>
     <p>This app supports HP firmware controls and does not provide custom fan curves
     or arbitrary RPM targets. Availability depends on your laptop and Linux driver.</p>
@@ -46,6 +46,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.1.0" date="2026-10-16">
+      <description><p>Authenticate once per app session for thermal profile and fan changes. Lock controls from the menu or close the app to end the privileged session.</p></description>
+    </release>
     <release version="1.0.3" date="2026-10-16">
       <description><p>Replace preview screenshots with live hardware captures in light and dark appearance.</p></description>
     </release>

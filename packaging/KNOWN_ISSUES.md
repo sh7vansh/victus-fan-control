@@ -54,3 +54,9 @@ The separate `.flatpak` remains useful for offline transfer but can still show i
 A Software window which predates the first installation can retain a generic icon even though both installed AppStream icon files match the custom fan artwork. In the observed case, closing and reopening GNOME Software restored the fan icon; the user confirmed the corrected rendering. No icon asset replacement was needed.
 
 Version 1.0.3 replaces preview captures with live, read-only hardware screenshots. The listing checker now verifies cached icon content and exact source screenshot URLs. It reproduced a stale gallery by failing on the old preview URLs, then passes after refreshing only the Fan Control AppStream catalog and reopening Software. The installed application need not be updated to refresh the catalog.
+
+## Session authorization in 1.1.0
+
+The previous per-write `pkexec tee` flow is replaced by an app-session helper. The first change authenticates; later changes use a private, enumerated protocol. Lock Fan Controls or window close ends the session. The helper is not installed as a system service. A missing heartbeat expires an idle helper within 20 seconds; a crash or disconnected helper requires a new authorization on the next attempt.
+
+Real polkit startup and EOF shutdown were tested on the Fedora target using only heartbeat messages and one authentication. Hardware writes in the new protocol were tested against temporary sysfs; the automated suite does not claim real authenticated firmware writes on every laptop. See packaging/README.md for the current design; older per-write examples in the original distribution research describe the earlier release.

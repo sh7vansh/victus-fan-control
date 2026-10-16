@@ -3,13 +3,13 @@
 from pathlib import Path
 import sys
 import tempfile
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fan_control.app import FanApplication, FanWindow
-from fan_control.host import HostHardware, HostWriteRequest, PROFILE_PATH
+from fan_control.host import HostHardware, PROFILE_PATH
 from gi.repository import Gio, GLib
+from session_fixture import fixture_session
 import test_hardware
 
 
@@ -46,16 +46,17 @@ class HostApplication(FanApplication):
         self.fixture = fixture
         self.stage = 0
         self.ticks = 0
+        self.launches = []
+        self.authorization_factory = lambda: fixture_session(fixture.root, self.launches)
         self.command = "write"
 
-    def argv(self, request):
-        if self.command == "reject":
-            return [sys.executable, "-c", "import sys; sys.stdin.read(); raise SystemExit(1)"]
-        if self.command == "cancel":
-            return ["/usr/bin/env", str(self.fixture.root / "not-executable")]
-        if self.command == "ignore":
-            return [sys.executable, "-c", "import sys; sys.stdin.read()"]
-        return ["/usr/bin/tee", "--", str(self.hardware.local_path(request.path))]
+    @property
+    def command(self):
+        return (self.fixture.root / "test-command").read_text()
+
+    @command.setter
+    def command(self, value):
+        (self.fixture.root / "test-command").write_text(value)
 
     def do_activate(self):
         self.window = FanWindow(self, self.hardware)
@@ -80,6 +81,9 @@ class HostApplication(FanApplication):
                 w.maximum.set_active(False)
             elif self.stage == 3:
                 assert w.snapshot.mode == 2 and not w.maximum.get_active()
+                assert len(self.launches) == 1, "Repeated changes authenticated more than once"
+                w.lock_action.activate(None)
+                assert not w.authorization.unlocked
                 self.command = "cancel"
                 w.maximum.set_active(True)
             elif self.stage == 4:
@@ -113,8 +117,7 @@ fixture.setUp()
 (fixture.root / "not-executable").write_text("not executable\n")
 try:
     app = HostApplication(fixture)
-    with patch.object(HostWriteRequest, "argv", new=property(app.argv)):
-        result = app.run([sys.argv[0]])
+    result = app.run([sys.argv[0]])
 finally:
     fixture.doCleanups()
 raise SystemExit(1 if app.failure else result)

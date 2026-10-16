@@ -19,7 +19,7 @@ def copy_file(source, destination, mode=0o644):
 
 def install(prefix):
     base = prefix / "share/victus-fan-control"
-    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py"):
+    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py", "authorization.py", "privileged.py"):
         copy_file(SOURCE / "fan_control" / name, base / "fan_control" / name)
     shutil.copytree(SOURCE / "data/icons", base / "data/icons", dirs_exist_ok=True)
     copy_file(SOURCE / "data" / f"{APP_ID}.metainfo.xml", base / "data" / f"{APP_ID}.metainfo.xml")

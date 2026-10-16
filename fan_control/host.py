@@ -1,6 +1,5 @@
 """Flatpak host bridge. Read as the user; authenticate only sysfs writes."""
 
-from dataclasses import dataclass
 import json
 from pathlib import Path
 
@@ -14,7 +13,7 @@ PROFILE_PATH = Path("/sys/firmware/acpi/platform_profile")
 
 # Run a copy of our read-only discovery logic as the normal host user. Passing
 # the code directly needs no host installation and no access to the checkout.
-# The privileged command is always the host's tee, never this Python code.
+# Privileged changes use the separate session helper; this code stays unprivileged.
 READ_SCRIPT = Path(__file__).with_name("hardware.py").read_text() + """
 import json
 from dataclasses import asdict
@@ -47,13 +46,6 @@ def parse_snapshot(output):
     if not isinstance(labels, list) or len(labels) != 2 or not all(isinstance(label, str) for label in labels):
         raise ValueError("The host returned invalid fan labels.")
     return Snapshot(profile, tuple(choices), controller, mode, tuple(rpm), tuple(labels))
-
-
-@dataclass(frozen=True)
-class HostWriteRequest(WriteRequest):
-    @property
-    def argv(self):
-        return [*SPAWN, *super().argv]
 
 
 class HostHardware:
@@ -93,12 +85,12 @@ class HostHardware:
             raise ValueError("Thermal profile controls are unavailable.")
         if value not in PROFILES or value not in self.snapshot.choices:
             raise ValueError("This thermal profile is not supported by your firmware.")
-        return HostWriteRequest(PROFILE_PATH, value)
+        return WriteRequest(PROFILE_PATH, value)
 
     def fan_request(self, maximum):
         if not self.available or self.snapshot.controller is None or self.snapshot.mode is None:
             raise ValueError("The HP fan controller is unavailable.")
-        return HostWriteRequest(self.snapshot.controller / "pwm1_enable", "0" if maximum else "2")
+        return WriteRequest(self.snapshot.controller / "pwm1_enable", "0" if maximum else "2")
 
     def verify_async(self, request, finished):
         def readback(output, error):

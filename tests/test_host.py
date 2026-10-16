@@ -50,10 +50,8 @@ class HostTests(unittest.TestCase):
         self.assertEqual(fixture.hardware.read().profile, "balanced")
         self.assertEqual(fixture.hardware.read().mode, 2)
 
-    def test_only_validated_settings_become_authenticated_host_commands(self):
+    def test_only_validated_settings_become_write_requests(self):
         request = self.host.profile_request("quiet")
-        self.assertEqual(request.argv, ["/usr/bin/flatpak-spawn", "--host", "/usr/bin/pkexec",
-                                       "/usr/bin/tee", "--", "/sys/firmware/acpi/platform_profile"])
         self.assertEqual(request.value, "quiet")
         self.assertEqual(self.host.fan_request(True).value, "0")
         self.assertEqual(self.host.fan_request(False).value, "2")

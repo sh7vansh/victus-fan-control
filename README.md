@@ -16,7 +16,7 @@ flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control
 flatpak run io.github.sh7vansh.VictusFanControl
 ```
 
-The app uses `flatpak-spawn --host` and the host's `pkexec`; no separate RPM or service is required. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Fan changes still require administrator authentication. See [packaging details](packaging/README.md).
+The app uses `flatpak-spawn --host` and the host's `pkexec`; no separate RPM or service is required. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Fan changes require administrator authentication once per app session. See [packaging details](packaging/README.md).
 
 Requires supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent on the host. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
 
@@ -38,7 +38,7 @@ From this directory:
 /usr/bin/python3 -m fan_control
 ```
 
-Source runs use the host's direct `pkexec` backend. Tested with GTK 4.22 and libadwaita 1.9.
+Source runs use the same temporary session helper directly on the host. Tested with GTK 4.22 and libadwaita 1.9.
 
 ## What the controls do
 
@@ -53,9 +53,13 @@ The controller is discovered by its `hp` hwmon name and `hp-wmi` platform path, 
 
 ## Authentication
 
-In native direct mode, the app stays unprivileged. Each requested write runs `/usr/bin/pkexec /usr/bin/tee -- <discovered sysfs attribute>`, with the validated setting passed over standard input. GNOME presents its standard polkit authentication dialog; it may describe the operation as running `tee`. Your password is handled by polkit, not the app. A cancelled or failed request leaves the interface showing the actual hardware state.
+The first setting change opens the system's polkit authentication dialog. After authentication, the app reuses a temporary privileged helper for the rest of that app session. Further profile changes and max/automatic fan toggles do not prompt again. **Lock Fan Controls** in the menu ends the session immediately; the next change asks again. Closing the window also ends it. If the helper crashes or the connection is lost, a new authorization may be needed.
 
-Neither native direct mode nor the default Flatpak needs a privileged daemon, custom root script, passwordless rule, altered sysfs permissions, startup task, or kernel module installation. The Flatpak runs its read commands and `pkexec` on the host via `flatpak-spawn --host`. A graphical polkit authentication agent must be running (GNOME provides one). The kernel and firmware retain their thermal protections.
+The UI and RPM monitoring stay unprivileged. The host's Python runs the app's small helper in isolated mode (`-I`), with a private stdin/stdout pipe. The helper accepts only four named thermal profiles and maximum/automatic fan modes. It discovers HP sysfs paths itself and never accepts paths, executable names, or code from protocol messages. It cannot create arbitrary files or follow a substituted sysfs attribute symlink. Both client and helper validate settings.
+
+The helper exits on pipe closure; a 20-second heartbeat timeout bounds its lifetime after an unexpected disconnect. Flatpak also uses `flatpak-spawn --host --watch-bus`. No daemon, host-package installation, passwordless rule, permission change, or system-wide polkit policy is installed. The administrator prompt may describe running Python: that interpreter runs the app's fixed fan helper. Your password is handled by polkit, never the app. Cancelling authentication leaves cooling unchanged.
+
+Firmware settings themselves remain active when the authorization session closes; locking does not change the selected cooling mode. The kernel and firmware retain their thermal protections.
 
 ## Preview and checks
 

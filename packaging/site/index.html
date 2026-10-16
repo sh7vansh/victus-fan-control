@@ -18,7 +18,7 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 <a href="https://github.com/sh7vansh/victus-fan-control">Source code</a>
 </header>
 <p>Choose a firmware thermal profile, switch both fans to maximum speed, and check live fan RPM. The app follows your desktop’s light or dark appearance.</p>
-<p>Version @VERSION@ includes new screenshots captured directly from a running HP Victus.</p>
+<p>Version @VERSION@ lets you authenticate once per app session, then adjust cooling without repeated prompts. Use Lock Fan Controls in the menu to lock the session again.</p>
 <div class="gallery" aria-label="Application screenshots">
 <figure>
 <img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/fcbdd7f9153bef2cbe373b9261116435f6336d8b/data/screenshots/fan-control-light.png" width="520" height="820" alt="Fan Control in light appearance, showing live fan RPM and firmware controls">
@@ -34,7 +34,7 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 <p><code>flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref</code></p>
 <p>A separate RPM or service is not needed. Supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent are required on the host.</p>
 <h2>Host access and cooling</h2>
-<p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. Fan changes require administrator authentication through polkit. Your password is handled by the system.</p>
+<p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. The first fan change requires administrator authentication through polkit. The temporary fan-control helper handles later changes in the same app session and exits when you close or lock it. Your password is handled by the system.</p>
 <p>Maximum fan speed remains active after closing the app. Turn it off to restore automatic cooling. Available profiles and fan controls depend on the laptop’s firmware and Linux driver. Screenshots show live readings from an HP Victus. Fan speeds vary with workload and temperature.</p>
 <footer>
 MIT license · By Shivansh Singh · <a href="https://github.com/sh7vansh/victus-fan-control/issues">Report a problem</a> · <a href="https://github.com/sh7vansh/victus-fan-control/releases">Releases</a> · <a href="fan-control.flatpakrepo">Repository</a> · <a href="signing-key.gpg">Signing public key</a>

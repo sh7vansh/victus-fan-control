@@ -1,12 +1,12 @@
 # Flatpak packaging
 
-Fan Control is one Flatpak; no host RPM or service is required. Read-only discovery runs host Python as the current user. Changes use `flatpak-spawn --host /usr/bin/pkexec /usr/bin/tee -- <validated sysfs attribute>` with the setting on standard input. Reads and verification are asynchronous. Cancelled authentication restores the actual hardware state in the controls.
+Fan Control is one Flatpak; no host RPM or service is required. Read-only discovery runs host Python as the current user. The first change starts `flatpak-spawn --host --watch-bus /usr/bin/pkexec --disable-internal-agent /usr/bin/python3 -I -u -c <fixed helper source>`. After one authentication, subsequent changes use its private pipe. The helper accepts only enumerated thermal profile and maximum/automatic fan operations; it discovers sysfs paths itself and accepts no client paths or executable commands. It exits on pipe closure, manual locking, or a 20-second heartbeat timeout after loss of the client. No helper is installed on the host. Reads and verification are asynchronous. Cancelled authentication restores the actual hardware state in the controls.
 
 The host needs Python 3.10+, polkit, coreutils, and a graphical authentication agent. Hardware support depends on HP firmware and the Linux driver.
 
 ## Permission
 
-`--talk-name=org.freedesktop.Flatpak` allows commands as the host user outside the sandbox. It does not grant root; protected writes require polkit authentication. Host commands can access user files, so the sandbox is not a security boundary against this app. GNOME Software's “Potentially Unsafe” warning is accurate. Wayland, fallback X11, IPC, and graphics rendering are also enabled.
+`--talk-name=org.freedesktop.Flatpak` allows commands as the host user outside the sandbox. It does not grant root; the temporary privileged helper requires polkit authentication once per app session. Host commands can access user files, so the sandbox is not a security boundary against this app. GNOME Software's “Potentially Unsafe” warning is accurate. Wayland, fallback X11, IPC, and graphics rendering are also enabled.
 
 ## Install
 
@@ -72,7 +72,7 @@ appstreamcli validate --no-net data/io.github.sh7vansh.VictusFanControl.metainfo
 /usr/bin/python3 packaging/check_software_page.py dist/fan-control.flatpakref
 ```
 
-The final check resolves the published reference through GNOME Software without installing it. CI tests the hardware backends and validates source metadata; it does not exercise real authorization or firmware. GUI tests use temporary files or preview data. Manual authentication and real writes still need testing on each supported laptop/driver combination.
+The final check resolves the published reference through GNOME Software without installing it. CI tests the hardware backends and validates source metadata; it does not exercise real authorization or firmware. On the target Fedora laptop, the real pkexec helper startup, repeated heartbeat messages, and clean EOF shutdown were verified with one authentication and no hardware writes. GUI tests use temporary files or preview data. Session tests exercise the production protocol unprivileged against temporary sysfs and cover reuse, locking, EOF, heartbeat expiry, cancellation, rejected writes, malformed requests, missing attributes, symlinks, timeouts, and crashes. Manual authentication and real writes still need testing on each supported laptop/driver combination.
 
 The bundle validator inspects embedded metadata/icons. This alone cannot prove the software-center page is complete. For repository signatures/catalog verification without changing normal installations, use a temporary `FLATPAK_USER_DIR` and run only `flatpak --user` commands; see [distribution research](DISTRIBUTION_RESEARCH.md).
 

@@ -43,11 +43,6 @@ class WriteRequest:
     path: Path
     value: str
 
-    @property
-    def argv(self) -> list[str]:
-        # pkexec authenticates an ordinary system binary, never user-writable code.
-        # No shell, sudo GUI, custom polkit rule, or persistent root process.
-        return ["/usr/bin/pkexec", "/usr/bin/tee", "--", str(self.path)]
 
 
 class Hardware:

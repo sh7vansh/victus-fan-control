@@ -82,10 +82,6 @@ class HardwareTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.hardware.verify(request)
 
-    def test_authentication_uses_system_binary_and_argument_array(self):
-        request = self.hardware.profile_request("quiet")
-        self.assertEqual(request.argv, ["/usr/bin/pkexec", "/usr/bin/tee", "--", str(self.acpi / "platform_profile")])
-        self.assertEqual(WriteRequest(Path("/path with spaces/pwm1_enable"), "0").argv[-1], "/path with spaces/pwm1_enable")
 
 
 if __name__ == "__main__":

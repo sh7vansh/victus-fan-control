@@ -3,13 +3,13 @@
 from pathlib import Path
 import sys
 import tempfile
-from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fan_control.app import FanApplication, FanWindow
 from fan_control.hardware import Hardware, WriteRequest
 from gi.repository import Gio, GLib
+from session_fixture import fixture_session
 
 
 class IntegrationApplication(FanApplication):
@@ -19,17 +19,17 @@ class IntegrationApplication(FanApplication):
         self.hardware = Hardware(root)
         self.stage = 0
         self.ticks = 0
+        self.launches = []
+        self.authorization_factory = lambda: fixture_session(root, self.launches)
         self.command = "write"
 
-    def argv(self, request):
-        if self.command == "reject":
-            return [sys.executable, "-c", "import sys; sys.stdin.read(); raise SystemExit(1)"]
-        if self.command == "cancel":
-            # env exits 126 without consuming stdin, like an early pkexec cancel.
-            return ["/usr/bin/env", str(self.hardware.root / "not-executable")]
-        if self.command == "ignore":
-            return [sys.executable, "-c", "import sys; sys.stdin.read()"]
-        return ["/usr/bin/tee", "--", str(request.path)]
+    @property
+    def command(self):
+        return (self.hardware.root / "test-command").read_text()
+
+    @command.setter
+    def command(self, value):
+        (self.hardware.root / "test-command").write_text(value)
 
     def do_activate(self):
         self.window = FanWindow(self, self.hardware)
@@ -63,6 +63,9 @@ class IntegrationApplication(FanApplication):
             elif self.stage == 4:
                 assert w.error_banner.get_revealed(), "Failed subprocess not reported"
                 assert w.snapshot.profile == "cool" and w.profile_buttons["cool"].get_active()
+                assert len(self.launches) == 1, "Repeated changes authenticated more than once"
+                w.lock_action.activate(None)
+                assert not w.authorization.unlocked
                 self.command = "cancel"
                 w.maximum.set_active(True)
             elif self.stage == 5:
@@ -111,6 +114,5 @@ with tempfile.TemporaryDirectory(prefix="fan-control-test-") as directory:
     for name, value in {"name": "hp", "fan1_input": "0", "fan2_input": "2576", "pwm1_enable": "2"}.items():
         (controller / name).write_text(value + "\n")
     app = IntegrationApplication(root)
-    with patch.object(WriteRequest, "argv", new=property(app.argv)):
-        result = app.run([sys.argv[0]])
+    result = app.run([sys.argv[0]])
     raise SystemExit(1 if app.failure else result)

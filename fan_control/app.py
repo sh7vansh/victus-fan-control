@@ -12,6 +12,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from . import __version__
+from .authorization import AuthenticationCancelled, AuthorizationSession
 from .hardware import DemoHardware, Hardware, PROFILES
 from .host import HostHardware
 
@@ -69,14 +70,23 @@ class FanWindow(Adw.ApplicationWindow):
         self.snapshot = hardware.read()
         self.busy = False
         self.syncing = False
-        self.process = None
         self.error_detail = ""
+        self.authorization = None if isinstance(hardware, DemoHardware) else AuthorizationSession()
+        if self.authorization is not None:
+            factory = getattr(application, "authorization_factory", None)
+            if factory:
+                self.authorization = factory()
+            self.authorization.changed = self.update_authorization
+        self.lock_action = Gio.SimpleAction.new("lock-controls", None)
+        self.lock_action.connect("activate", lambda *_: self.authorization.close())
+        self.add_action(self.lock_action)
         self.connect("close-request", self.on_close)
 
         toolbar = Adw.ToolbarView()
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(title="Fan Control", subtitle="HP Victus / OMEN"))
         menu = Gio.Menu()
+        menu.append("Lock Fan Controls", "win.lock-controls")
         menu.append("About Fan Control", "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu))
         toolbar.add_top_bar(header)
@@ -157,11 +167,12 @@ class FanWindow(Adw.ApplicationWindow):
         self.help_label.add_css_class("dim-label")
         self.help_label.add_css_class("caption")
         footer.append(self.help_label)
-        auth = Gtk.Label(label="Authentication is required to change settings.", wrap=True,
+        self.auth = Gtk.Label(wrap=True,
                          justify=Gtk.Justification.CENTER, margin_top=4)
-        auth.add_css_class("dim-label")
-        auth.add_css_class("caption")
-        footer.append(auth)
+        self.auth.add_css_class("dim-label")
+        self.auth.add_css_class("caption")
+        footer.append(self.auth)
+        self.update_authorization()
         body.append(footer)
         self.refresh()
         self.poll_source = GLib.timeout_add_seconds(1, self.refresh)
@@ -241,12 +252,13 @@ class FanWindow(Adw.ApplicationWindow):
         # Revert the widget to the hardware state until authorization/write succeeds.
         self.refresh()
         self.busy = True
+        self.update_authorization()
         self.error_banner.set_revealed(False)
         for row in self.profile_rows.values():
             row.set_sensitive(False)
         self.maximum.set_sensitive(False)
         self.spinner.set_spinning(True)
-        self.status.set_label("Applying setting…" if isinstance(self.hardware, DemoHardware) else "Waiting for authentication…")
+        self.status.set_label("Applying setting…" if self.authorization is None or self.authorization.unlocked else "Waiting for authentication…")
         if isinstance(self.hardware, DemoHardware):
             def apply_demo():
                 self.hardware.apply(request)
@@ -254,45 +266,28 @@ class FanWindow(Adw.ApplicationWindow):
                 return GLib.SOURCE_REMOVE
             GLib.timeout_add(180, apply_demo)
             return
-        try:
-            flags = Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
-            self.process = Gio.Subprocess.new(request.argv, flags)
-            self.process.communicate_utf8_async(request.value + "\n", None,
-                                                self.write_finished, (request, success_message))
-        except GLib.Error as error:
-            self.fail(error.message)
-
-    def write_finished(self, process, result, data):
-        request, message = data
-        self.process = None
-        try:
-            _, _output, errors = process.communicate_utf8_finish(result)
-            if not process.get_successful():
-                if process.get_if_exited() and process.get_exit_status() == 126:
-                    self.authentication_cancelled()
-                    return
-                raise ValueError((errors or "The system refused the change. Check that a polkit authentication agent is running.").strip())
-            # Give firmware a moment to publish the accepted value before readback.
-            GLib.timeout_add(250, self.complete_write, request, message)
-        except GLib.Error as error:
-            # A cancelled pkexec can close stdin before communicate writes to it.
-            # Reap it before distinguishing cancellation from a failed write.
-            process.wait_async(None, self.write_io_failed, str(error))
-        except ValueError as error:
-            self.fail(str(error))
-
-    def write_io_failed(self, process, result, detail):
-        try:
-            process.wait_finish(result)
-            if process.get_if_exited() and process.get_exit_status() == 126:
+        def written(error):
+            if isinstance(error, AuthenticationCancelled):
                 self.authentication_cancelled()
+            elif error is not None:
+                self.fail(str(error))
             else:
-                self.fail(detail)
-        except GLib.Error as error:
-            self.fail(error.message)
+                GLib.timeout_add(250, self.complete_write, request, success_message)
+        self.authorization.change(request, written)
+
+    def update_authorization(self):
+        unlocked = self.authorization is not None and self.authorization.unlocked
+        self.lock_action.set_enabled(unlocked and not self.busy)
+        if hasattr(self, "auth"):
+            self.auth.set_label("Preview mode does not require authentication." if self.authorization is None else
+                                "Fan controls unlocked for this app session." if unlocked else
+                                "Authenticate once per app session to change settings.")
+        if unlocked and self.busy:
+            self.status.set_label("Applying setting…")
 
     def authentication_cancelled(self):
         self.busy = False
+        self.update_authorization()
         self.spinner.set_spinning(False)
         self.refresh()
         self.toast_overlay.add_toast(Adw.Toast(title="Authentication cancelled"))
@@ -304,6 +299,7 @@ class FanWindow(Adw.ApplicationWindow):
                     self.fail(str(error))
                     return
                 self.busy = False
+                self.update_authorization()
                 self.spinner.set_spinning(False)
                 self.refresh()
                 self.toast_overlay.add_toast(Adw.Toast(title=message))
@@ -312,6 +308,7 @@ class FanWindow(Adw.ApplicationWindow):
         try:
             self.hardware.verify(request)
             self.busy = False
+            self.update_authorization()
             self.spinner.set_spinning(False)
             self.refresh()
             self.toast_overlay.add_toast(Adw.Toast(title=message))
@@ -321,6 +318,7 @@ class FanWindow(Adw.ApplicationWindow):
 
     def fail(self, detail):
         self.busy = False
+        self.update_authorization()
         self.spinner.set_spinning(False)
         self.error_detail = detail
         self.error_banner.set_revealed(True)
@@ -345,6 +343,8 @@ class FanWindow(Adw.ApplicationWindow):
             self.toast_overlay.add_toast(Adw.Toast(title="Finish or cancel authentication before closing"))
             return True
         GLib.source_remove(self.poll_source)
+        if self.authorization is not None:
+            self.authorization.close()
         return False
 
 
@@ -422,6 +422,13 @@ class FanApplication(Adw.Application):
             self.failure = True
             self.quit()
         return GLib.SOURCE_REMOVE
+
+    def do_shutdown(self):
+        for window in self.get_windows():
+            authorization = getattr(window, "authorization", None)
+            if authorization is not None:
+                authorization.close()
+        Adw.Application.do_shutdown(self)
 
     def show_about(self, *_args):
         dialog = Adw.AboutDialog(application_name="Fan Control", application_icon=APP_ID,
