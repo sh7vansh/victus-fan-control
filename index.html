@@ -13,12 +13,11 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 <img src="icon.png?v=1.5.0" width="96" height="96" alt="Fan Control icon">
 <h1>Fan Control</h1>
 <a class="version" href="https://github.com/sh7vansh/victus-fan-control/releases/tag/v1.5.0">Version 1.5.0 · Free and open source</a>
-<p>Manage cooling on HP Victus and OMEN laptops with a native GTK 4 and libadwaita app.</p>
+<p>Fan controls for HP Victus and OMEN laptops on Linux.</p>
 <a class="install" href="fan-control.flatpakref">Install with Flatpak</a>
 <a href="https://github.com/sh7vansh/victus-fan-control">Source code</a>
 </header>
-<p>Choose a firmware thermal profile, switch both fans to maximum speed, and check live fan RPM. The app follows your desktop’s light or dark appearance.</p>
-<p>Version 1.5.0 includes a compiled helper, so the host needs no Python or Go installation. Enable the background service with administrator authentication, then adjust cooling without repeated prompts. Only the enabling user account and root can access its socket.</p>
+<p>Choose a thermal profile, toggle maximum fan speed, and monitor both fans’ RPM. Built with GTK 4 and libadwaita.</p>
 <div class="gallery" aria-label="Application screenshots">
 <figure>
 <img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/044b5d07fb1b4402df5c78f6710b73fa7d347042/data/screenshots/fan-control-light.png" width="520" height="820" alt="Fan Control in light appearance, showing live fan RPM and firmware controls">
@@ -30,12 +29,13 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 </figure>
 </div>
 <h2>Installation</h2>
-<p>Open the downloaded <code>.flatpakref</code> in your software center. It adds the signed Fan Control repository for future updates. You can also run:</p>
+<p>Open the <code>.flatpakref</code> in your software center, or run:</p>
 <p><code>flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref</code></p>
-<p>No separate RPM is needed. Cooling controls require the system service configured by the app. Supported HP firmware, Flatpak, systemd, polkit, coreutils, and a graphical authentication agent are required. The compiled helper is included.</p>
-<h2>Host access and cooling</h2>
-<p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. Enabling or updating the service requires administrator authentication through polkit. A root-owned helper handles cooling changes through a socket restricted to your account. The service remains active when the app closes. Use Update Service after app updates, restart Flatpak after service changes, and Disable Service before uninstalling. Your password is handled by the system.</p>
-<p>Maximum fan speed remains active after closing the app. Turn it off to restore automatic cooling. Available profiles and fan controls depend on the laptop’s firmware and Linux driver. Screenshots show live readings from an HP Victus. Fan speeds vary with workload and temperature.</p>
+<p>Choose <strong>Enable Service</strong>, authenticate, and restart when prompted. Requires supported HP firmware, <code>hp-wmi</code>, systemd, polkit, coreutils, and a graphical authentication agent. Updates come from the signed Fan Control repository.</p>
+<h2>Using the app</h2>
+<p>On GNOME, the OMEN button opens Fan Control if the key was unassigned. After app updates, choose <strong>Update Service</strong> and restart. Choose <strong>Disable Service</strong> before uninstalling to remove the host service.</p>
+<p><strong>Maximum fan speed stays active after closing.</strong> Turn it off to restore automatic cooling. Available controls depend on your firmware.</p>
+<p>The app runs commands on the host as your user, which software centers label “Potentially Unsafe.” Cooling changes use a root-owned service accessible to your account and root.</p>
 <footer>
 MIT license · By Shivansh Singh · <a href="https://github.com/sh7vansh/victus-fan-control/issues">Report a problem</a> · <a href="https://github.com/sh7vansh/victus-fan-control/releases">Releases</a> · <a href="fan-control.flatpakrepo">Repository</a> · <a href="signing-key.gpg">Signing public key</a>
 </footer>
