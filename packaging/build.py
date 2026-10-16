@@ -56,9 +56,9 @@ def flatpak(test=False, signing_key=None, gpg_homedir=None):
                 "from fan_control.app import FanApplication; "
                 "from fan_control.host import HostHardware; "
                 "assert isinstance(FanApplication().hardware, HostHardware); "
-                "from fan_control.authorization import session_argv; "
-                "assert session_argv()[:3] == ['/usr/bin/flatpak-spawn', '--host', '--watch-bus']; "
-                "print('Flatpak selects host reads and a watched authorization session')")
+                "from fan_control.native import helper_argv; "
+                "assert helper_argv('--daemon', privileged=True)[:3] == ['/usr/bin/flatpak-spawn', '--host', '--watch-bus']; "
+                "print('Flatpak selects host reads and daemon management path')")
             run("flatpak", "build", *manifest["finish-args"], stage, "/app/bin/fan-control", "--smoke-test")
             run("flatpak", "build", *manifest["finish-args"], stage, "python3", "-c",
                 (SOURCE / "packaging/check_sandbox_session.py").read_text())

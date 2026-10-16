@@ -12,7 +12,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from . import __version__
-from .authorization import AuthenticationCancelled, AuthorizationSession
+from .authorization import AuthorizationSession, ServiceUnavailable
 from .hardware import DemoHardware, Hardware, PROFILES
 from .host import HostHardware
 from .power_profiles import (
@@ -99,9 +99,6 @@ class FanWindow(Adw.ApplicationWindow):
             if factory:
                 self.authorization = factory()
             self.authorization.changed = self.update_authorization
-        self.lock_action = Gio.SimpleAction.new("lock-controls", None)
-        self.lock_action.connect("activate", lambda *_: self.authorization.close())
-        self.add_action(self.lock_action)
         self.service_action = Gio.SimpleAction.new("manage-service", None)
         self.service_action.connect("activate", self.on_manage_service)
         self.service_action.set_enabled(not isinstance(hardware, DemoHardware))
@@ -115,7 +112,6 @@ class FanWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.set_title_widget(Adw.WindowTitle(title="Fan Control", subtitle="HP Victus / OMEN"))
         menu = Gio.Menu()
-        menu.append("Lock Fan Controls", "win.lock-controls")
         menu.append("Background Service…", "win.manage-service")
         menu.append("About Fan Control", "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu))
@@ -125,6 +121,10 @@ class FanWindow(Adw.ApplicationWindow):
         self.set_content(self.toast_overlay)
         self.toast_overlay.set_child(toolbar)
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.service_banner = Adw.Banner(title="Background service required for cooling controls",
+                                         button_label="Enable Service", revealed=False)
+        self.service_banner.connect("button-clicked", lambda *_: self.on_manage_service(None, None))
+        outer.append(self.service_banner)
         self.error_banner = Adw.Banner(title="The setting could not be changed", button_label="Details", revealed=False)
         self.error_banner.connect("button-clicked", self.show_error)
         outer.append(self.error_banner)
@@ -288,7 +288,7 @@ class FanWindow(Adw.ApplicationWindow):
             row.set_sensitive(False)
         self.maximum.set_sensitive(False)
         self.spinner.set_spinning(True)
-        self.status.set_label("Applying setting…" if self.authorization is None or self.authorization.unlocked else "Waiting for authentication…")
+        self.status.set_label("Applying setting…" if self.authorization is None or self.authorization.unlocked else "Connecting to background service…")
         if isinstance(self.hardware, DemoHardware):
             def apply_demo():
                 self.hardware.apply(request)
@@ -297,9 +297,7 @@ class FanWindow(Adw.ApplicationWindow):
             GLib.timeout_add(180, apply_demo)
             return
         def written(error):
-            if isinstance(error, AuthenticationCancelled):
-                self.authentication_cancelled()
-            elif error is not None:
+            if error is not None:
                 self.fail(str(error))
             else:
                 GLib.timeout_add(250, self.complete_write, request, success_message)
@@ -307,19 +305,18 @@ class FanWindow(Adw.ApplicationWindow):
 
     def update_authorization(self):
         unlocked = self.authorization is not None and self.authorization.unlocked
-        is_daemon = getattr(self.authorization, "is_daemon", False)
-        self.lock_action.set_enabled(unlocked and not self.busy and not is_daemon)
+        active = is_service_active()
+        if hasattr(self, "service_banner"):
+            self.service_banner.set_revealed(not active and not isinstance(self.hardware, DemoHardware))
         if hasattr(self, "auth"):
             if self.authorization is None:
-                self.auth.set_label("Preview mode does not require authentication.")
-            elif is_daemon:
-                self.auth.set_label("Background service active (passwordless).")
-            elif is_service_active():
-                self.auth.set_label("Background service active. Restart app to connect.")
+                self.auth.set_label("Preview mode does not require background service.")
             elif unlocked:
-                self.auth.set_label("Fan controls unlocked for this app session.")
+                self.auth.set_label("Background service active (passwordless).")
+            elif active:
+                self.auth.set_label("Background service active. Restart app to connect.")
             else:
-                self.auth.set_label("Authenticate once per app session to change settings.")
+                self.auth.set_label("Background service is not running.")
         if unlocked and self.busy:
             self.status.set_label("Applying setting…")
 
@@ -391,13 +388,6 @@ class FanWindow(Adw.ApplicationWindow):
         if self.authorization:
             self.authorization.close()
         self.update_authorization()
-
-    def authentication_cancelled(self):
-        self.busy = False
-        self.update_authorization()
-        self.spinner.set_spinning(False)
-        self.refresh()
-        self.toast_overlay.add_toast(Adw.Toast(title="Authentication cancelled"))
 
     def complete_write(self, request, message):
         if isinstance(self.hardware, HostHardware):
