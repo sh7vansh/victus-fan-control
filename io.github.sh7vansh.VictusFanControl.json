@@ -10,7 +10,8 @@
     "--share=ipc",
     "--device=dri",
     "--talk-name=org.freedesktop.Flatpak",
-    "--system-talk-name=net.hadess.PowerProfiles"
+    "--system-talk-name=net.hadess.PowerProfiles",
+    "--filesystem=/run/victus-fan-control.sock"
   ],
   "modules": [
     {

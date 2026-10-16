@@ -1,11 +1,13 @@
-"""One polkit authorization for a window's private, fan-only command pipe."""
+"""One authorization session for a window's fan-control command pipe (via daemon socket or polkit helper)."""
 
 import json
+from pathlib import Path
 
 from gi.repository import Gio, GLib
 
 from .hardware import PROFILES
 from .native import helper_argv
+from .service import DAEMON_SOCKET
 
 
 class AuthenticationCancelled(ValueError):
@@ -18,18 +20,27 @@ def session_argv():
 
 class AuthorizationSession:
     def __init__(self, changed=lambda: None, argv_factory=session_argv,
-                 heartbeat_ms=5000, reply_timeout_ms=5000):
+                 heartbeat_ms=5000, reply_timeout_ms=5000,
+                 socket_path: Path | None = DAEMON_SOCKET):
         self.changed = changed
         self.argv_factory = argv_factory
         self.heartbeat_ms = heartbeat_ms
         self.reply_timeout_ms = reply_timeout_ms
+        self.socket_path = Path(socket_path) if socket_path is not None else None
         self.process = None
+        self.connection = None
+        self.input = None
+        self.output_stream = None
         self.unlocked = False
+        self.is_daemon = False
         self.pending = None
         self.counter = 0
         self.heartbeat = 0
         self.deadline = 0
         self.writing = False
+        self._token = object()
+        if self.socket_path and self.socket_path.exists():
+            self._connect_socket()
 
     def change(self, request, finished):
         if self.pending:
@@ -47,6 +58,49 @@ class AuthorizationSession:
         if self.unlocked:
             self._send_change()
             return
+        if self.connection is not None or self.process is not None:
+            return
+        if self.socket_path and self.socket_path.exists():
+            self._connect_socket()
+            return
+        self._spawn_process()
+
+    def _connect_socket(self):
+        client = Gio.SocketClient.new()
+        address = Gio.UnixSocketAddress.new(str(self.socket_path))
+        token = object()
+        self._token = token
+        try:
+            client.connect_async(address, None, self._on_socket_connected, token)
+        except (GLib.Error, OSError):
+            self.connection = None
+            self.is_daemon = False
+            if self.pending:
+                self._spawn_process()
+
+    def _on_socket_connected(self, client, result, token):
+        if token is not self._token:
+            try:
+                conn = client.connect_finish(result)
+                conn.close(None)
+            except Exception:
+                pass
+            return
+        try:
+            self.connection = client.connect_finish(result)
+            self.input = Gio.DataInputStream.new(self.connection.get_input_stream())
+            self.input.set_newline_type(Gio.DataStreamNewlineType.LF)
+            self.output_stream = self.connection.get_output_stream()
+            self.is_daemon = True
+            self._read(self.connection)
+        except (GLib.Error, OSError):
+            self.connection = None
+            self.is_daemon = False
+            if self.pending:
+                self._spawn_process()
+
+    def _spawn_process(self):
+        self._token = object()
         try:
             flags = (Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE
                      | Gio.SubprocessFlags.STDERR_SILENCE)
@@ -54,21 +108,25 @@ class AuthorizationSession:
             self.process = process
             self.input = Gio.DataInputStream.new(process.get_stdout_pipe())
             self.input.set_newline_type(Gio.DataStreamNewlineType.LF)
+            self.output_stream = process.get_stdin_pipe()
+            self.is_daemon = False
             self._read(process)
             process.wait_async(None, self._exited)
         except (GLib.Error, OSError) as error:
             self._fail(ValueError(str(error)))
 
-    def _read(self, process):
-        self.input.read_line_async(GLib.PRIORITY_DEFAULT, None, self._received, process)
+    def _read(self, source):
+        if self.input:
+            self.input.read_line_async(GLib.PRIORITY_DEFAULT, None, self._received, source)
 
-    def _received(self, stream, result, process):
+    def _received(self, stream, result, source):
         try:
             line, _ = stream.read_line_finish_utf8(result)
-            if process is not self.process:
+            if source is not (self.process or self.connection):
                 return
             if line is None:
-                # wait_async classifies an authentication cancellation (exit 126).
+                if self.connection is source:
+                    self._fail(ValueError("The fan-control daemon disconnected."))
                 return
             message = json.loads(line)
             if not self.unlocked:
@@ -85,10 +143,10 @@ class AuthorizationSession:
                     raise ValueError("The fan-control session returned an invalid response.")
                 error = None if message["ok"] else ValueError(str(message.get("error", "The firmware refused the setting.")))
                 self._finish(error)
-            if process is self.process:
-                self._read(process)
+            if source is (self.process or self.connection):
+                self._read(source)
         except (GLib.Error, ValueError, TypeError) as error:
-            if process is self.process:
+            if source is (self.process or self.connection):
                 self._fail(ValueError(str(error)))
 
     def _send_change(self):
@@ -98,32 +156,31 @@ class AuthorizationSession:
         self._write(self.pending[0])
 
     def _write(self, message):
+        source = self.process or self.connection
         if self.writing:
-            # A short heartbeat write can still be completing when a click arrives.
-            GLib.timeout_add(10, self._write_when_ready, message, self.process)
+            GLib.timeout_add(10, self._write_when_ready, message, source)
             return
         self.writing = True
-        process = self.process
-        process.get_stdin_pipe().write_all_async(
-            (json.dumps(message) + "\n").encode(), GLib.PRIORITY_DEFAULT, None, self._written, process)
+        stream = self.output_stream
+        if stream:
+            stream.write_all_async(
+                (json.dumps(message) + "\n").encode(), GLib.PRIORITY_DEFAULT, None, self._written, source)
 
-    def _write_when_ready(self, message, process):
-        if process is not self.process:
+    def _write_when_ready(self, message, source):
+        if source is not (self.process or self.connection):
             return GLib.SOURCE_REMOVE
         if self.writing:
             return GLib.SOURCE_CONTINUE
         self._write(message)
         return GLib.SOURCE_REMOVE
 
-    def _written(self, stream, result, process):
+    def _written(self, stream, result, source):
         error = None
         try:
             stream.write_all_finish(result)
         except GLib.Error as failure:
             error = failure
-        if process is not self.process:
-            # A lock/close may coincide with an asynchronous heartbeat write.
-            # Close after that write completes, so EOF reaches the helper promptly.
+        if source is not (self.process or self.connection):
             try:
                 stream.close(None)
             except GLib.Error:
@@ -175,12 +232,22 @@ class AuthorizationSession:
             if source:
                 GLib.source_remove(source)
         self.heartbeat = self.deadline = 0
+        self._token = object()
         process, self.process = self.process, None
+        connection, self.connection = self.connection, None
+        self.output_stream = None
+        self.input = None
         self.unlocked = False
+        self.is_daemon = False
         self.writing = False
         if process:
             try:
                 process.get_stdin_pipe().close(None)
+            except GLib.Error:
+                pass
+        if connection:
+            try:
+                connection.close(None)
             except GLib.Error:
                 pass
         self.changed()

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -223,9 +225,60 @@ func TestIdleAndEOFCloseWithoutWriting(t *testing.T) {
 }
 func TestProductionCLIRejectsAlternativeRootsAndUnprivilegedSessions(t *testing.T) {
 	c := fixture(t)
-	for _, args := range [][]string{{"--session"}, {"--session", c.root}, {"--root", c.root}, {"--fixture-session", c.root}, {"--verify-profile", "/etc/passwd"}} {
+	for _, args := range [][]string{{"--session"}, {"--session", c.root}, {"--daemon"}, {"--root", c.root}, {"--fixture-session", c.root}, {"--verify-profile", "/etc/passwd"}} {
 		if err := run(args, strings.NewReader(""), io.Discard, c, 1000); err == nil {
 			t.Fatalf("Accepted unsupported CLI: %v", args)
 		}
+	}
+}
+
+func TestDaemonServerAndRejectsUnprivileged(t *testing.T) {
+	c := fixture(t)
+	if err := run([]string{"--daemon"}, strings.NewReader(""), io.Discard, c, 1000); err == nil {
+		t.Fatal("Accepted unprivileged daemon run")
+	}
+
+	sockPath := filepath.Join(t.TempDir(), "test.sock")
+	go func() {
+		_ = runDaemon(sockPath, c)
+	}()
+
+	var conn net.Conn
+	var err error
+	for i := 0; i < 20; i++ {
+		time.Sleep(10 * time.Millisecond)
+		conn, err = net.Dial("unix", sockPath)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		t.Fatalf("Could not connect to daemon socket: %v", err)
+	}
+	defer conn.Close()
+
+	reader := bufio.NewReader(conn)
+	greeting, err := reader.ReadBytes('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(greeting), `"ready":true`) {
+		t.Fatalf("Unexpected greeting: %s", greeting)
+	}
+
+	fmt.Fprintf(conn, "{\"id\":1,\"operation\":\"profile\",\"value\":\"quiet\"}\n")
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	var resp reply
+	if err := json.Unmarshal(line, &resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.OK || resp.ID == nil || *resp.ID != 1 {
+		t.Fatalf("Unexpected daemon reply: %+v", resp)
+	}
+	if err := c.verify("profile", "quiet"); err != nil {
+		t.Fatal(err)
 	}
 }

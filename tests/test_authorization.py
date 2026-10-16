@@ -1,7 +1,11 @@
 import json
+import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
+import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -25,7 +29,7 @@ class AuthorizationTests(unittest.TestCase):
         def argv():
             self.launches.append(True)
             return fixture_argv(fixture.root)
-        self.session = AuthorizationSession(argv_factory=argv)
+        self.session = AuthorizationSession(argv_factory=argv, socket_path=None)
         self.addCleanup(self.session.close)
 
     def change(self, value, path="platform_profile"):
@@ -169,6 +173,84 @@ class AuthorizationTests(unittest.TestCase):
             with patch.object(Path, "exists", return_value=True), patch.object(Path, "read_text", return_value=f"[Instance]\napp-path={path}\n"):
                 with self.assertRaises(ValueError):
                     host_helper_path()
+
+    def test_daemon_socket_connection_and_request(self):
+        sock_dir = tempfile.mkdtemp()
+        sock_path = Path(sock_dir) / "test-daemon.sock"
+        srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        srv.bind(str(sock_path))
+        srv.listen(1)
+
+        def handle():
+            conn, _ = srv.accept()
+            conn.sendall(b'{"ready": true}\n')
+            data = conn.recv(1024)
+            msg = json.loads(data.decode().strip())
+            reply = {"id": msg["id"], "ok": True}
+            conn.sendall((json.dumps(reply) + "\n").encode())
+            srv.close()
+
+        t = threading.Thread(target=handle)
+        t.start()
+
+        session = AuthorizationSession(argv_factory=lambda: self.launches.append(True), socket_path=sock_path)
+        self.addCleanup(session.close)
+        self.spin(100)
+        self.assertTrue(session.unlocked)
+        self.assertTrue(session.is_daemon)
+
+        loop = GLib.MainLoop()
+        results = []
+        session.change(WriteRequest(Path("/sys/test/platform_profile"), "quiet"), lambda err: (results.append(err), loop.quit()))
+        loop.run()
+        t.join()
+        if sock_path.exists():
+            os.remove(sock_path)
+        os.rmdir(sock_dir)
+
+        self.assertEqual(len(results), 1)
+        self.assertIsNone(results[0])
+        self.assertEqual(len(self.launches), 0)
+
+    def test_daemon_socket_fallback_when_socket_missing(self):
+        fake_path = Path("/tmp/definitely-nonexistent-victus-123.sock")
+        session = AuthorizationSession(argv_factory=lambda: fixture_argv(self.fixture.root), socket_path=fake_path)
+        self.addCleanup(session.close)
+        self.assertFalse(session.unlocked)
+        self.assertFalse(session.is_daemon)
+
+        loop = GLib.MainLoop()
+        results = []
+        session.change(WriteRequest(Path("/sys/test/platform_profile"), "quiet"), lambda err: (results.append(err), loop.quit()))
+        loop.run()
+
+        self.assertEqual(len(results), 1)
+        self.assertIsNone(results[0])
+        self.assertTrue(session.unlocked)
+        self.assertFalse(session.is_daemon)
+
+    def test_daemon_socket_fallback_when_connection_fails(self):
+        sock_dir = tempfile.mkdtemp()
+        sock_path = Path(sock_dir) / "dead.sock"
+        srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        srv.bind(str(sock_path))
+        srv.close()  # socket file exists on disk, but no listener
+
+        session = AuthorizationSession(argv_factory=lambda: fixture_argv(self.fixture.root), socket_path=sock_path)
+        self.addCleanup(session.close)
+
+        loop = GLib.MainLoop()
+        results = []
+        session.change(WriteRequest(Path("/sys/test/platform_profile"), "quiet"), lambda err: (results.append(err), loop.quit()))
+        loop.run()
+        if sock_path.exists():
+            os.remove(sock_path)
+        os.rmdir(sock_dir)
+
+        self.assertEqual(len(results), 1)
+        self.assertIsNone(results[0])
+        self.assertTrue(session.unlocked)
+        self.assertFalse(session.is_daemon)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -20,6 +22,7 @@ var version = "development"
 
 const maxLine = 1024
 const idleTimeout = 20 * time.Second
+const defaultSocketPath = "/run/victus-fan-control.sock"
 
 var profiles = map[string]bool{"quiet": true, "cool": true, "balanced": true, "performance": true}
 
@@ -219,20 +222,29 @@ func serve(input io.Reader, output io.Writer, c changer, timeout time.Duration) 
 			}
 		}
 	}()
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+	var timer *time.Timer
+	if timeout > 0 {
+		timer = time.NewTimer(timeout)
+		defer timer.Stop()
+	}
 	reset := func() {
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
+		if timer != nil {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
 			}
+			timer.Reset(timeout)
 		}
-		timer.Reset(timeout)
 	}
 	for {
+		var timeoutChan <-chan time.Time
+		if timer != nil {
+			timeoutChan = timer.C
+		}
 		select {
-		case <-timer.C:
+		case <-timeoutChan:
 			return nil
 		case line, ok := <-lines:
 			if !ok || special(line, "close") {
@@ -260,6 +272,43 @@ func serve(input io.Reader, output io.Writer, c changer, timeout time.Duration) 
 		}
 	}
 }
+
+func runDaemon(socketPath string, c controls) error {
+	_ = os.Remove(socketPath)
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = listener.Close()
+		_ = os.Remove(socketPath)
+	}()
+	_ = os.Chmod(socketPath, 0666)
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		_ = listener.Close()
+		_ = os.Remove(socketPath)
+		os.Exit(0)
+	}()
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return nil
+			}
+			return err
+		}
+		go func(nc net.Conn) {
+			defer nc.Close()
+			_ = serve(nc, nc, c, 0)
+		}(conn)
+	}
+}
+
 func run(args []string, input io.Reader, output io.Writer, c controls, uid int) error {
 	if len(args) == 1 {
 		switch args[0] {
@@ -273,17 +322,27 @@ func run(args []string, input io.Reader, output io.Writer, c controls, uid int) 
 				return errors.New("Administrator authentication is required for fan changes.")
 			}
 			return serve(input, output, c, idleTimeout)
+		case "--daemon":
+			if uid != 0 {
+				return errors.New("Administrator authentication is required to run the daemon.")
+			}
+			return runDaemon(defaultSocketPath, c)
 		}
 	}
 	if len(args) == 2 {
 		switch args[0] {
+		case "--daemon":
+			if uid != 0 {
+				return errors.New("Administrator authentication is required to run the daemon.")
+			}
+			return runDaemon(args[1], c)
 		case "--verify-profile":
 			return c.verify("profile", args[1])
 		case "--verify-fan":
 			return c.verify("fan", args[1])
 		}
 	}
-	return errors.New("Expected --snapshot, --session, --version, --verify-profile VALUE, or --verify-fan VALUE.")
+	return errors.New("Expected --snapshot, --session, --daemon, --version, --verify-profile VALUE, or --verify-fan VALUE.")
 }
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout, controls{root: "/sys"}, os.Geteuid()); err != nil {

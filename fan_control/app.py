@@ -21,6 +21,7 @@ from .power_profiles import (
     sync_to_desktop,
     unsubscribe_desktop_changes,
 )
+from .service import install_service_async, is_service_active, uninstall_service_async
 
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
@@ -86,6 +87,10 @@ class FanWindow(Adw.ApplicationWindow):
         self.lock_action = Gio.SimpleAction.new("lock-controls", None)
         self.lock_action.connect("activate", lambda *_: self.authorization.close())
         self.add_action(self.lock_action)
+        self.service_action = Gio.SimpleAction.new("manage-service", None)
+        self.service_action.connect("activate", self.on_manage_service)
+        self.service_action.set_enabled(not isinstance(hardware, DemoHardware))
+        self.add_action(self.service_action)
         self.desktop_sync_id = None
         if is_live_hardware(hardware):
             self.desktop_sync_id = subscribe_desktop_changes(self._on_desktop_profile_change)
@@ -96,6 +101,7 @@ class FanWindow(Adw.ApplicationWindow):
         header.set_title_widget(Adw.WindowTitle(title="Fan Control", subtitle="HP Victus / OMEN"))
         menu = Gio.Menu()
         menu.append("Lock Fan Controls", "win.lock-controls")
+        menu.append("Background Service…", "win.manage-service")
         menu.append("About Fan Control", "app.about")
         header.pack_end(Gtk.MenuButton(icon_name="open-menu-symbolic", menu_model=menu))
         toolbar.add_top_bar(header)
@@ -286,13 +292,65 @@ class FanWindow(Adw.ApplicationWindow):
 
     def update_authorization(self):
         unlocked = self.authorization is not None and self.authorization.unlocked
-        self.lock_action.set_enabled(unlocked and not self.busy)
+        is_daemon = getattr(self.authorization, "is_daemon", False)
+        self.lock_action.set_enabled(unlocked and not self.busy and not is_daemon)
         if hasattr(self, "auth"):
-            self.auth.set_label("Preview mode does not require authentication." if self.authorization is None else
-                                "Fan controls unlocked for this app session." if unlocked else
-                                "Authenticate once per app session to change settings.")
+            if self.authorization is None:
+                self.auth.set_label("Preview mode does not require authentication.")
+            elif is_daemon:
+                self.auth.set_label("Background service active (passwordless).")
+            elif unlocked:
+                self.auth.set_label("Fan controls unlocked for this app session.")
+            else:
+                self.auth.set_label("Authenticate once per app session to change settings.")
         if unlocked and self.busy:
             self.status.set_label("Applying setting…")
+
+    def on_manage_service(self, _action, _param):
+        active = is_service_active()
+        status_text = "Active (passwordless control enabled)" if active else "Inactive"
+        dialog = Adw.AlertDialog.new(
+            "Background Service",
+            f"Running the fan control daemon as a background service allows changing fan speeds and thermal profiles without requiring password authentication each session.\n\nStatus: {status_text}"
+        )
+        dialog.add_response("cancel", "Cancel")
+        if active:
+            dialog.add_response("uninstall", "Disable Service")
+            dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
+        else:
+            dialog.add_response("install", "Enable Service")
+            dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+
+        def on_response(_d, response):
+            if response == "install":
+                self.toast_overlay.add_toast(Adw.Toast(title="Configuring background service…"))
+                install_service_async(self._on_service_installed)
+            elif response == "uninstall":
+                self.toast_overlay.add_toast(Adw.Toast(title="Removing background service…"))
+                uninstall_service_async(self._on_service_uninstalled)
+
+        dialog.connect("response", on_response)
+        dialog.present(self)
+
+    def _on_service_installed(self, error):
+        if error is not None:
+            self.fail(f"Failed to configure background service: {error}")
+            return
+        self.toast_overlay.add_toast(Adw.Toast(title="Background service enabled"))
+        if self.authorization:
+            self.authorization.close()
+            if self.authorization.socket_path and self.authorization.socket_path.exists():
+                self.authorization._connect_socket()
+        self.update_authorization()
+
+    def _on_service_uninstalled(self, error):
+        if error is not None:
+            self.fail(f"Failed to remove background service: {error}")
+            return
+        self.toast_overlay.add_toast(Adw.Toast(title="Background service disabled"))
+        if self.authorization:
+            self.authorization.close()
+        self.update_authorization()
 
     def authentication_cancelled(self):
         self.busy = False
