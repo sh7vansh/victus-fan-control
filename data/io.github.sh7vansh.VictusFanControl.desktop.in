@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Fan Control
+Comment=Control HP Victus and OMEN cooling profiles and fan speed
+Exec=@EXEC@
+Icon=io.github.sh7vansh.VictusFanControl
+Terminal=false
+Categories=GTK;Settings;HardwareSettings;
+Keywords=fan;cooling;thermal;HP;Victus;OMEN;performance;
+StartupNotify=true

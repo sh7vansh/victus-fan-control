@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sh7vansh.VictusFanControl</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Fan Control</name>
+  <summary>Manage cooling on HP Victus and OMEN laptops</summary>
+  <developer id="io.github.sh7vansh">
+    <name>Shivansh Singh</name>
+  </developer>
+  <description>
+    <p>Take control of cooling on supported HP Victus and OMEN laptops.
+    Choose the right thermal profile for your work and check both fans at a glance.</p>
+    <ul>
+      <li>Choose Quiet, Cool, Balanced, or Performance when supported by your firmware</li>
+      <li>Run both fans at maximum speed, then switch back to automatic cooling</li>
+      <li>See live CPU and GPU fan speeds, updated every second</li>
+      <li>Follow your desktop's light or dark appearance</li>
+    </ul>
+    <p>Changes require administrator authentication. Max fan speed stays active
+    when you close the app; turn it off to restore automatic cooling.</p>
+    <p>This app supports HP firmware controls and does not provide custom fan curves
+    or arbitrary RPM targets. Availability depends on your laptop and Linux driver.</p>
+    <p>Host-command access is required. The host must provide Python 3.10 or newer,
+    polkit, coreutils, and a graphical authentication agent. No companion service
+    package is needed. Preview mode works without supported hardware.</p>
+  </description>
+  <url type="homepage">https://sh7vansh.github.io/victus-fan-control/</url>
+  <url type="vcs-browser">https://github.com/sh7vansh/victus-fan-control</url>
+  <url type="bugtracker">https://github.com/sh7vansh/victus-fan-control/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Thermal profiles and live fan speeds in light appearance</caption>
+      <image type="source" width="520" height="900">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/v1.0.2/data/screenshots/fan-control-light.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Thermal profiles and live fan speeds in dark appearance</caption>
+      <image type="source" width="520" height="900">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/v1.0.2/data/screenshots/fan-control-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <launchable type="desktop-id">io.github.sh7vansh.VictusFanControl.desktop</launchable>
+  <categories><category>Settings</category><category>HardwareSettings</category></categories>
+  <keywords>
+    <keyword>fan</keyword><keyword>cooling</keyword><keyword>thermal</keyword>
+    <keyword>HP</keyword><keyword>Victus</keyword><keyword>OMEN</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.2" date="2026-10-16">
+      <description><p>Add hosted screenshots, project and support links, and a signed update repository for a complete software-center listing.</p></description>
+    </release>
+    <release version="1.0.1" date="2026-10-16">
+      <description><p>Include the application icon and full software information in the Flatpak installer.</p></description>
+    </release>
+    <release version="1.0.0" date="2026-10-16">
+      <description><p>Initial release with thermal profiles, maximum fan mode, and live fan readings.</p></description>
+    </release>
+  </releases>
+  <supports><control>pointing</control><control>keyboard</control></supports>
+</component>

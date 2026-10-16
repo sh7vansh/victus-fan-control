@@ -1,0 +1,20 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install validation dependencies
+        run: sudo apt-get update && sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 appstream desktop-file-utils
+      - name: Test hardware and host backends
+        run: /usr/bin/python3 -m unittest discover -s tests -v
+      - name: Validate metadata
+        run: |
+          appstreamcli validate --no-net data/io.github.sh7vansh.VictusFanControl.metainfo.xml
+          sed 's|@EXEC@|fan-control|g' data/io.github.sh7vansh.VictusFanControl.desktop.in > /tmp/io.github.sh7vansh.VictusFanControl.desktop
+          desktop-file-validate /tmp/io.github.sh7vansh.VictusFanControl.desktop
+      - name: Compile Python sources
+        run: /usr/bin/python3 -m compileall -q fan_control packaging tests

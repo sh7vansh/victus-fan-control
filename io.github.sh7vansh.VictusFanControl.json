@@ -1,0 +1,28 @@
+{
+  "app-id": "io.github.sh7vansh.VictusFanControl",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "51",
+  "sdk": "org.gnome.Sdk",
+  "command": "fan-control",
+  "finish-args": [
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--share=ipc",
+    "--device=dri",
+    "--talk-name=org.freedesktop.Flatpak"
+  ],
+  "modules": [
+    {
+      "name": "victus-fan-control",
+      "buildsystem": "simple",
+      "build-commands": ["python3 packaging/install_files.py --prefix=/app"],
+      "sources": [
+        {
+          "type": "dir",
+          "path": ".",
+          "skip": [".git", ".flatpak-builder", "build", "repo", "dist", "__pycache__"]
+        }
+      ]
+    }
+  ]
+}
