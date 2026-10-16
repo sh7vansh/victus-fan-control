@@ -21,11 +21,26 @@ from .power_profiles import (
     sync_to_desktop,
     unsubscribe_desktop_changes,
 )
+from .native import FLATPAK_INFO
 from .service import install_service_async, is_service_active, uninstall_service_async
 
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
 DATA = Path(__file__).resolve().parent.parent / "data"
+
+
+def restart_app():
+    if FLATPAK_INFO.exists():
+        cmd = ["/usr/bin/flatpak-spawn", "--host", "flatpak", "run", APP_ID]
+        Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
+    else:
+        cmd = [sys.executable, "-m", "fan_control"]
+        Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
+    app = Gio.Application.get_default()
+    if app:
+        app.quit()
+    else:
+        sys.exit(0)
 
 
 def fan_icon(size=16):
@@ -299,6 +314,8 @@ class FanWindow(Adw.ApplicationWindow):
                 self.auth.set_label("Preview mode does not require authentication.")
             elif is_daemon:
                 self.auth.set_label("Background service active (passwordless).")
+            elif is_service_active():
+                self.auth.set_label("Background service active. Restart app to connect.")
             elif unlocked:
                 self.auth.set_label("Fan controls unlocked for this app session.")
             else:
@@ -308,7 +325,13 @@ class FanWindow(Adw.ApplicationWindow):
 
     def on_manage_service(self, _action, _param):
         active = is_service_active()
-        status_text = "Active (passwordless control enabled)" if active else "Inactive"
+        socket_visible = self.authorization and self.authorization.socket_path and self.authorization.socket_path.exists()
+        if active and not socket_visible and FLATPAK_INFO.exists():
+            status_text = "Active on host (restart app to activate passwordless control)"
+        elif active:
+            status_text = "Active (passwordless control enabled)"
+        else:
+            status_text = "Inactive"
         dialog = Adw.AlertDialog.new(
             "Background Service",
             f"Running the fan control daemon as a background service allows changing fan speeds and thermal profiles without requiring password authentication each session.\n\nStatus: {status_text}"
@@ -336,12 +359,29 @@ class FanWindow(Adw.ApplicationWindow):
         if error is not None:
             self.fail(f"Failed to configure background service: {error}")
             return
-        self.toast_overlay.add_toast(Adw.Toast(title="Background service enabled"))
         if self.authorization:
             self.authorization.close()
             if self.authorization.socket_path and self.authorization.socket_path.exists():
                 self.authorization._connect_socket()
         self.update_authorization()
+        socket_visible = self.authorization and self.authorization.socket_path and self.authorization.socket_path.exists()
+        if FLATPAK_INFO.exists() and not socket_visible:
+            dialog = Adw.AlertDialog.new(
+                "Restart Required",
+                "The background service is now installed and active on your system.\n\nRestart the application to switch to passwordless fan control."
+            )
+            dialog.add_response("later", "Restart Later")
+            dialog.add_response("restart", "Restart Now")
+            dialog.set_response_appearance("restart", Adw.ResponseAppearance.SUGGESTED)
+
+            def on_response(_d, response):
+                if response == "restart":
+                    restart_app()
+
+            dialog.connect("response", on_response)
+            dialog.present(self)
+        else:
+            self.toast_overlay.add_toast(Adw.Toast(title="Background service enabled"))
 
     def _on_service_uninstalled(self, error):
         if error is not None:

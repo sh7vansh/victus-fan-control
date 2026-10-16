@@ -1,6 +1,7 @@
 """Manage the background fan control system service (systemd unit)."""
 
 from pathlib import Path
+import subprocess
 from gi.repository import Gio
 
 from .native import FLATPAK_INFO, host_helper_path
@@ -10,8 +11,13 @@ UNIT_PATH = Path("/etc/systemd/system/victus-fan-control.service")
 
 
 def is_service_active(socket_path: Path = DAEMON_SOCKET) -> bool:
-    """Check if the background daemon socket is present and active."""
-    return socket_path.exists()
+    """Check if the background daemon service is active on the system."""
+    try:
+        cmd = host_command_argv("systemctl", "is-active", "--quiet", "victus-fan-control.service", privileged=False)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return result.returncode == 0
+    except (FileNotFoundError, OSError):
+        return socket_path.exists()
 
 
 def service_unit_content(helper_path: Path) -> str:
