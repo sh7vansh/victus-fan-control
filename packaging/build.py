@@ -8,9 +8,13 @@ import json
 from pathlib import Path
 import platform
 import subprocess
+import sys
 import tempfile
 
 from install_files import install, SOURCE
+
+sys.path.insert(0, str(SOURCE))
+from fan_control import __version__
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
 
@@ -86,7 +90,8 @@ def make_site(public, public_key):
         "SuggestRemoteName=victus-fan-control\n"
         "RuntimeRepo=https://dl.flathub.org/repo/flathub.flatpakrepo\n" + common)
     (public / ".nojekyll").touch()
-    shutil.copyfile(SOURCE / "packaging/site/index.html", public / "index.html")
+    template = (SOURCE / "packaging/site/index.html").read_text()
+    (public / "index.html").write_text(template.replace("@VERSION@", __version__))
     shutil.copyfile(SOURCE / f"data/icons/hicolor/128x128/apps/{APP_ID}.png", public / "icon.png")
 
 
