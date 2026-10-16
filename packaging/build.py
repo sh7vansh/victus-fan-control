@@ -73,6 +73,7 @@ def flatpak(test=False, signing_key=None, gpg_homedir=None):
             legacy_ref = f"app/{LEGACY_APP_ID}/{platform.machine()}/stable"
             if (repo / "refs/heads" / legacy_ref).is_file():
                 run("flatpak", "build-commit-from", *signing, "--no-update-summary",
+                    f"--src-ref={legacy_ref}",
                     f"--end-of-life-rebase={LEGACY_APP_ID}={APP_ID}",
                     "--end-of-life=Fan Control has moved to its repository-matching application ID.",
                     repo, legacy_ref)
