@@ -31,11 +31,11 @@
   <screenshots>
     <screenshot type="default">
       <caption>Thermal profiles and live fan speeds in light appearance</caption>
-      <image type="source" width="520" height="820">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-light.png</image>
+      <image type="source" width="520" height="820">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/fcbdd7f9153bef2cbe373b9261116435f6336d8b/data/screenshots/fan-control-light.png</image>
     </screenshot>
     <screenshot>
       <caption>Thermal profiles and live fan speeds in dark appearance</caption>
-      <image type="source" width="520" height="820">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-dark.png</image>
+      <image type="source" width="520" height="820">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/fcbdd7f9153bef2cbe373b9261116435f6336d8b/data/screenshots/fan-control-dark.png</image>
     </screenshot>
   </screenshots>
   <launchable type="desktop-id">io.github.sh7vansh.VictusFanControl.desktop</launchable>
