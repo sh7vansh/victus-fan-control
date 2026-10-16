@@ -105,7 +105,7 @@ class AuthorizationTests(unittest.TestCase):
         session = fixture_session(self.fixture.root, launched)
         self.addCleanup(session.fixture_daemon.close)
         self.addCleanup(session.close)
-        # Exercise the constructor's in-flight connect without a preparatory spin.
+        # Request before the constructor's connection completes.
         self.assertIsNone(self.change_with_session(session, "quiet"))
         self.assertEqual(self.fixture.hardware.read().profile, "quiet")
         session.close()
@@ -121,7 +121,6 @@ class AuthorizationTests(unittest.TestCase):
                 server.listen(2)
                 session = AuthorizationSession(socket_path=path, reply_timeout_ms=50)
                 self.addCleanup(session.close)
-                # A listening socket accepts connections but never sends its greeting.
                 error = self.change_with_session(session, "quiet")
                 self.assertIn("Timed out", str(error))
                 self.assertFalse(session.unlocked)
@@ -164,7 +163,6 @@ class AuthorizationTests(unittest.TestCase):
         def handle():
             conn, _ = srv.accept()
             conn.sendall(b'{"ready": true}\n')
-            # Wait for client to establish session before disconnecting
             ready_event.wait(1.0)
             conn.close()
             srv.close()
@@ -179,7 +177,6 @@ class AuthorizationTests(unittest.TestCase):
         self.assertTrue(session.unlocked)
         ready_event.set()
 
-        # Allow time to detect remote EOF
         self.spin(100)
         self.assertFalse(session.unlocked)
         t.join()
@@ -198,7 +195,6 @@ class AuthorizationTests(unittest.TestCase):
             conn, _ = srv.accept()
             conn.sendall(b'{"ready": true}\n')
             _ = conn.recv(1024)
-            # Never replies
             self.spin(200)
             conn.close()
             srv.close()

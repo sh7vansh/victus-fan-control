@@ -63,7 +63,6 @@ class PowerProfilesSyncTests(unittest.TestCase):
         self.assertEqual(sub_id, 42)
         mock_bus.signal_subscribe.assert_called_once()
 
-        # Simulate D-Bus signal invocation
         signal_callback = mock_bus.signal_subscribe.call_args[0][6]
         params = GLib.Variant("(sa{sv}as)", (
             "net.hadess.PowerProfiles",

@@ -28,7 +28,6 @@ class ServiceTests(unittest.TestCase):
     def test_installer_copies_helper_and_restarts_existing_service(self):
         helper = Path("/home/user/app files/$(touch /tmp/unexpected) 'helper")
         script = installation_script(helper, 1001)
-        # Validate shell syntax even with shell metacharacters in the source path.
         subprocess.run(["/bin/sh", "-n"], input=script, text=True, check=True)
         self.assertIn('install -o 0 -g 0 -m 0755 -- ', script)
         self.assertIn(f'ExecStart="{INSTALLED_HELPER}" --daemon --allow-uid 1001', script)

@@ -14,7 +14,6 @@ parser.add_argument("theme", choices=("light", "dark"))
 args = parser.parse_args()
 target = Path(__file__).resolve().parent.parent / "data/screenshots" / f"fan-control-{args.theme}.png"
 target.parent.mkdir(parents=True, exist_ok=True)
-# No smoke test: that exercises controls. This instance only reads real sensors.
 app = FanApplication(screenshot=target)
 app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)
 app.connect("startup", lambda *_: Adw.StyleManager.get_default().set_color_scheme(

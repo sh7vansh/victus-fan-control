@@ -14,8 +14,6 @@ class ServiceUnavailable(ValueError):
 
 
 class AuthorizationSession:
-    """Client for the background fan control system service daemon."""
-
     def __init__(self, changed=lambda: None, reply_timeout_ms=5000,
                  socket_path: Path | None = DAEMON_SOCKET):
         self.changed = changed
@@ -59,7 +57,6 @@ class AuthorizationSession:
         self._fail(ServiceUnavailable("The fan-control background service is not running."))
 
     def connect(self):
-        """Connect once, bounding both connection and protocol greeting time."""
         if not self.socket_path or self.connection is not None or self.connecting:
             return
         self.connecting = True

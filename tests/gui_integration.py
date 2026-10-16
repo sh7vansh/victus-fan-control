@@ -1,4 +1,4 @@
-"""Exercise the GTK/subprocess path against temporary files; no pkexec or sysfs writes."""
+"""GTK integration tests for the service client."""
 
 from pathlib import Path
 import sys

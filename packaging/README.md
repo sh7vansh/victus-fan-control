@@ -1,66 +1,63 @@
-# Flatpak packaging
+# Packaging
 
-Fan Control ships as a Flatpak with a static Go helper. Read-only discovery and verification run the bundled helper as the current user. Cooling writes use a systemd daemon installed through **Background Service… → Enable Service** and a polkit prompt. Installation copies the executable into root-owned `/usr/local/libexec/victus-fan-control/helper` and creates `/etc/systemd/system/victus-fan-control.service`; a persistent root unit must never execute from a writable checkout or per-user Flatpak deployment.
+The Flatpak bundles the Python UI and a static Go helper. It uses GNOME Platform 51; the host needs Flatpak, systemd, polkit, coreutils, and a graphical authentication agent.
 
-The host needs Flatpak, systemd, polkit (`pkexec`), coreutils, and a graphical authentication agent. Host Python and Go are not needed; Python for the UI comes from the GNOME runtime. The helper is built with `CGO_ENABLED=0`, and its ELF program headers are checked for the absence of a dynamic loader. Hardware support depends on HP firmware and the Linux driver.
+## Build
 
-## Permissions and service lifecycle
-
-On first normal launch on GNOME, the Flatpak uses host `gsettings` to assign the unmodified `Launch2` (OMEN) key to launch the app. It preserves existing assignments and subsequent edits or disabling of its shortcut. This user shortcut needs no administrator authentication and can be changed or removed in GNOME Settings → Keyboard → Custom Shortcuts. Demo, smoke-test, and source runs skip setup; other desktops are unchanged. Removing the Flatpak does not remove this desktop shortcut.
-
-`--talk-name=org.freedesktop.Flatpak` allows commands as the host user outside the sandbox. Host commands can access user files, so the sandbox is not a security boundary against this app. GNOME Software's “Potentially Unsafe” warning is accurate. Wayland, fallback X11, IPC, graphics rendering, desktop power-profile D-Bus access, and `/run/victus-fan-control.sock` access are also enabled.
-
-Enabling the service requires administrator authentication and records the enabling account's numeric UID. The daemon creates a mode `0600` socket owned by that account and checks `SO_PEERCRED` before sending the protocol greeting. Only that UID and root are accepted. The permission applies to all processes with that UID. Enabling or updating from a different account transfers access. The protocol permits only enumerated thermal profile and maximum/automatic fan operations; it accepts no client paths or executable commands.
-
-The service runs at boot and survives app closure and Flatpak updates. Choose **Update Service** after updating the app to refresh its root-owned helper and migrate old units. Installation atomically stages files and restarts an already running service. Flatpak must be restarted after enabling or updating, because its sandbox can retain the previous socket inode. The client bounds connection, greeting, and reply waits. Cancelled authentication does not alter cooling settings.
-
-Before uninstalling the Flatpak, use **Disable Service** to stop and remove the host unit, socket, and helper. Uninstalling the Flatpak alone leaves the service installed. Disabling the service or closing the app does not reset hardware settings.
-
-## Install
-
-Open [fan-control.flatpakref](https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref) in GNOME Software, or use:
-
-```sh
-flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref
-flatpak run io.github.sh7vansh.victus-fan-control
-flatpak update --user
-```
-
-The reference embeds the public key, adds the signed Fan Control update repository, and identifies Flathub as the runtime source. The secondary `.flatpak` bundle includes the repository origin, but [GNOME Software 50.4's bundle importer](KNOWN_ISSUES.md) omits some details. Prefer the reference for the complete listing.
-
-## Build locally
-
-With GNOME 51 Platform and a local Go 1.22+ compiler installed:
+With GNOME Platform 51 and Go 1.22+ installed:
 
 ```sh
 /usr/bin/python3 packaging/build.py flatpak --test
 ```
 
-This compiles the helper locally, then stages the Python UI and helper using the installed Platform. No SDK or flatpak-builder download is needed for this local route. Go builds use only the standard library with `GOPROXY=off` and `GOTOOLCHAIN=local`; no external Go modules or compiler downloads are used. It creates an unsigned development bundle under `dist/` and a development repository under `build/development-repo/`. The smoke test uses simulated readings; building does not install the app or alter fans. Omit `--test` without a graphical session.
+This builds the checkout into `dist/` and `build/development-repo/`. Omit `--test` without a graphical session.
 
-The conventional `io.github.sh7vansh.victus-fan-control.json` manifest also works with flatpak-builder, `org.gnome.Sdk//51`, and the matching `org.freedesktop.Sdk.Extension.golang` extension:
+The manifest builds its pinned source commit using GNOME SDK 51 and the matching Go SDK extension:
 
 ```sh
 flatpak-builder --user --install-deps-from=flathub --repo=repo \
-  --compose-url-policy=full --mirror-screenshots-url=https://dl.flathub.org/media \
   build/flatpak io.github.sh7vansh.victus-fan-control.json
 ```
 
-The manifest pins the source commit for reproducibility. The local `packaging/build.py` route builds the current checkout instead. The screenshot mirroring URL above is for a Flathub build candidate; its generated media must be deployed by Flathub before those URLs are usable by end users. The self-hosted release keeps its existing screenshot URLs.
+## Host service
 
-Run `/usr/bin/python3 packaging/check_flathub.py` to build a temporary candidate with mirrored screenshots and run the official linter in Podman. Results are saved under `build/flathub-lint/`. The command reports strict errors as well as the linter's permission-review mode; review warnings do not mean Flathub has approved a permission. No exceptions are suppressed, and this does not submit or publish the candidate.
+**Enable Service** uses polkit to install:
 
-## Application ID migration
+- `/usr/local/libexec/victus-fan-control/helper`, owned by root.
+- `/etc/systemd/system/victus-fan-control.service`.
 
-Version 1.5.0 uses `io.github.sh7vansh.victus-fan-control`, matching the GitHub repository. Signed releases retain the existing repository collection ID, export the new app first, and mark the old `io.github.sh7vansh.VictusFanControl` ref for rebase to the new ID. Existing users receive the migration through Flatpak updates. The background service and its authorized UID remain unchanged; the new app updates its own old OMEN launcher command without restoring a disabled binding or replacing a customized command.
+The service starts at boot and accepts cooling requests through `/run/victus-fan-control.sock`. The socket has mode `0600`; kernel peer credentials restrict access to the enabling account and root. Any process running as that account has access. Enabling the service from another account transfers ownership.
 
-## Signed release
+The helper accepts four thermal profiles and maximum/automatic fan modes. It discovers sysfs paths itself. Reads and readback run as the user; writes go through the service. The Flatpak locates its bundled helper through `Instance/app-path` in `/.flatpak-info`.
 
-The initial repository uses public-key fingerprint `03B3FEDB63A63601DBA151349836F000D7922580`. Keep its private key backed up securely outside Git. Losing it prevents seamless updates using the existing trust identity. Do not generate a new key for each release or publish a private key.
+**Update Service** replaces the installed helper. Restart the Flatpak afterward so it sees the new socket. **Disable Service** removes the unit and helper; uninstalling the Flatpak alone leaves them installed. Neither closing the app nor removing the service resets cooling settings.
 
-Before releasing, update the Python version and MetaInfo release, capture screenshots if the UI changed, and pin screenshot URLs to a published commit. Run the checks below, commit the source, and push the referenced commit before validating URLs.
+Host reads, service management, and GNOME shortcut setup use `flatpak-spawn --host`. The OMEN shortcut uses `Launch2`, preserves existing assignments, and can be changed in GNOME Settings. It remains after uninstalling the app.
 
-For the initial publisher, the dedicated key directory is `~/.local/share/victus-fan-control-release-keys`. The directory is private and is not part of the repository. Build with:
+## Checks
+
+```sh
+/usr/bin/python3 packaging/build_helper.py --test
+/usr/bin/python3 -m unittest discover -s tests -v
+/usr/bin/python3 tests/gui_integration.py
+/usr/bin/python3 tests/gui_host.py
+appstreamcli validate --no-net data/io.github.sh7vansh.victus-fan-control.metainfo.xml
+/usr/bin/python3 packaging/verify_bundle.py dist/io.github.sh7vansh.victus-fan-control-x86_64.flatpak
+/usr/bin/python3 packaging/check_software_page.py dist/fan-control.flatpakref
+```
+
+The GUI tests use temporary sysfs files and a test daemon. The last command checks the installer listing in GNOME Software. See [known issues](KNOWN_ISSUES.md) and [Flathub lint status](FLATHUB_LINT.md).
+
+## Release
+
+Keep the existing signing key and `gh-pages` history so installed apps can verify updates. On a fresh checkout, clone the public repository before building:
+
+```sh
+mkdir -p build
+git clone --single-branch --branch gh-pages git@github.com:sh7vansh/victus-fan-control.git build/public
+```
+
+Update the version in `fan_control/__init__.py` and MetaInfo, commit the source, then update the manifest's source commit. Refresh [screenshots](../data/screenshots/README.md) if the UI changed.
 
 ```sh
 /usr/bin/python3 packaging/build.py flatpak --test \
@@ -68,39 +65,10 @@ For the initial publisher, the dedicated key directory is `~/.local/share/victus
   --gpg-homedir ~/.local/share/victus-fan-control-release-keys
 ```
 
-The signed site/repository is `build/public/`. Both application commits and the summary are signed; AppStream and static deltas are generated. Reference files and the signing public key are also copied to `dist/`. Never mix unsigned development exports into the public repository.
+Commit and push `build/public/` to `gh-pages`. Attach the `.flatpakref`, `.flatpakrepo`, public key, bundle, and fresh SHA256 checksums from `dist/` to the GitHub release. The private key stays outside the repository.
 
-The GitHub Pages source is the `gh-pages` branch. Preserve the existing repository history for future updates. On a new checkout, clone that branch into `build/public` **before building**:
+To verify a release separately from installed apps, set `FLATPAK_USER_DIR` to a temporary directory and use `flatpak --user` for every command.
 
-```sh
-mkdir -p build
-git clone --single-branch --branch gh-pages git@github.com:sh7vansh/victus-fan-control.git build/public
-```
+### App ID migration
 
-After the signed build, review and commit the generated changes in `build/public`, push `gh-pages`, and attach the `.flatpakref`, `.flatpakrepo`, public key, bundle, and SHA256 checksums to the GitHub release. The root `.nojekyll` preserves static OSTree files. Pages hosts the repository at `https://sh7vansh.github.io/victus-fan-control/repo/`. Use `flatpak update --user` for installed applications.
-
-## Verify
-
-```sh
-/usr/bin/python3 packaging/build_helper.py --test
-/usr/bin/python3 -m unittest discover -s tests -v
-appstreamcli validate --no-net data/io.github.sh7vansh.victus-fan-control.metainfo.xml
-/usr/bin/python3 tests/gui_integration.py
-/usr/bin/python3 tests/gui_host.py
-/usr/bin/python3 packaging/verify_bundle.py dist/io.github.sh7vansh.victus-fan-control-x86_64.flatpak
-/usr/bin/python3 packaging/check_software_page.py dist/fan-control.flatpakref
-```
-
-The final check resolves the published reference through GNOME Software without installing it. CI tests hardware backends and source metadata. GUI tests use temporary hardware files and a real daemon compiled from the Go test sources; desktop power-profile writes are mocked. Go tests cover discovery, request validation, safe sysfs writes, bounded input, EOF/idle shutdown for the legacy session entry point, private daemon socket permissions, peer authorization, and privilege checks. Python tests cover daemon reuse, disconnects, greeting/reply timeouts, failed writes, service completion, and root-owned installation commands. Fixture roots and failure injection exist exclusively in `_test.go` files and are never packaged. Actual service installation, polkit prompts, and real firmware writes still need validation on each supported laptop/driver combination.
-
-The bundle validator inspects embedded metadata/icons. This alone cannot prove the software-center page is complete. For repository signatures/catalog verification without changing normal installations, use a temporary `FLATPAK_USER_DIR` and run only `flatpak --user` commands; see [distribution research](DISTRIBUTION_RESEARCH.md).
-
-Refresh icons with `python3 packaging/generate_icons.py`; see [screenshots](../data/screenshots/README.md) for captures. Max fan speed remains active after closing; turn it off to restore automatic cooling.
-
-## Helper deployment and portability
-
-The packaged executable is `/app/libexec/victus-fan-control-helper`. `fan_control/native.py` obtains its exact host path from the running sandbox's `[Instance] app-path` in `/.flatpak-info`. Reads use argument arrays. The service installer uses a shell script with quoted paths, checks command failures, copies the helper with root ownership, and restores SELinux labels when available. The service uses only the root-owned copy, so deleting or updating a Flatpak deployment does not invalidate its executable.
-
-The helper accepts `--snapshot`, `--verify-profile VALUE`, `--verify-fan VALUE`, `--version`, and root-only `--daemon --allow-uid UID`. The legacy root-only `--session` pipe protocol remains available for protocol tests, but the app no longer uses it. Production does not accept an alternate socket or sysfs root.
-
-Go's cgo support is disabled for the helper; see the [Go cgo documentation](https://go.dev/src/cmd/cgo/doc.go). Build architecture is selected explicitly from the local/SDK architecture. An incompatible CPU architecture or a host filesystem mounted with `noexec` can still prevent execution; static linking does not remove kernel, hardware, or polkit requirements. The Go runtime license is included in the app's licenses directory.
+Version 1.5.0 changed the ID from `io.github.sh7vansh.VictusFanControl` to `io.github.sh7vansh.victus-fan-control`. Signed builds retain the old collection ID and mark the old app ref for rebase. Keep that migration in future releases. On first launch, the new app updates its old OMEN shortcut command while preserving user edits.

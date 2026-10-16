@@ -1,4 +1,4 @@
-"""Read-only hardware discovery and validated write requests. No GTK dependency."""
+"""HP hardware discovery and write-request validation."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,7 +93,7 @@ class Hardware:
 
 
 class DemoHardware:
-    """In-memory preview. Never reads or writes hardware."""
+    """Simulated hardware for previews and tests."""
 
     def __init__(self):
         self.profile = "balanced"

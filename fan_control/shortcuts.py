@@ -1,4 +1,4 @@
-"""Set up the OMEN launcher on GNOME without replacing user shortcuts."""
+"""GNOME shortcut setup for the OMEN key."""
 
 import os
 import subprocess
@@ -32,18 +32,15 @@ def write_setting(schema, key, value):
 
 
 def uses_omen_key(bindings):
-    # GDK calls this key Launch2; XF86Launch2 is another common spelling.
     if isinstance(bindings, str):
         bindings = [bindings]
     return any(binding in ("Launch2", "XF86Launch2") for binding in bindings)
 
 
 def ensure_omen_shortcut():
-    """Configure once; existing, edited, or disabled shortcuts remain untouched."""
     schema = SHORTCUT_SCHEMA + ":" + SHORTCUT_PATH
     try:
-        # The name also records setup if the user later removes the shortcut
-        # from the active list or clears its binding in GNOME Settings.
+        # A saved name prevents setup from restoring a shortcut the user disabled.
         if read_setting(schema, "name"):
             if read_setting(schema, "command") == LEGACY_COMMAND:
                 write_setting(schema, "command", COMMAND)
@@ -64,8 +61,7 @@ def ensure_omen_shortcut():
             write_setting(MEDIA_KEYS, "custom-keybindings", [*paths, SHORTCUT_PATH])
         write_setting(schema, "name", "OMEN — Fan Control")
     except (OSError, subprocess.SubprocessError, GLib.Error):
-        # Missing GNOME schemas, locked settings, or host access must not
-        # prevent the cooling interface from opening.
+        # Shortcut setup is optional; leave the app usable if GNOME refuses it.
         return
 
 

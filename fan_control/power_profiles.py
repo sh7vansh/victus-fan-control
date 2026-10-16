@@ -1,4 +1,4 @@
-"""Synchronize firmware platform profiles with desktop power profiles (GNOME / TuneD)."""
+"""Desktop power-profile integration."""
 
 from pathlib import Path
 from gi.repository import Gio, GLib
@@ -21,7 +21,6 @@ FIRMWARE_PROFILES = {
 
 
 def is_live_hardware(hardware) -> bool:
-    """Return True if hardware represents the actual host system rather than a test fixture."""
     if isinstance(hardware, HostHardware):
         return True
     if isinstance(hardware, Hardware) and hardware.root == Path("/sys"):
@@ -37,7 +36,6 @@ def get_system_bus() -> Gio.DBusConnection | None:
 
 
 def sync_to_desktop(profile: str, bus: Gio.DBusConnection | None = None) -> None:
-    """Notify net.hadess.PowerProfiles of a firmware profile change."""
     gnome_profile = GNOME_POWER_PROFILES.get(profile)
     if not gnome_profile:
         return
@@ -74,7 +72,6 @@ def sync_to_desktop(profile: str, bus: Gio.DBusConnection | None = None) -> None
 
 
 def subscribe_desktop_changes(callback, bus: Gio.DBusConnection | None = None) -> int | None:
-    """Subscribe to ActiveProfile changes from net.hadess.PowerProfiles."""
     bus = bus or get_system_bus()
     if bus is None:
         return None

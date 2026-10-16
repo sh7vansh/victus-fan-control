@@ -1,4 +1,4 @@
-// Fan Control's host helper. No network, shell, subprocesses, or external modules.
+// Host helper for fan monitoring and sysfs writes.
 package main
 
 import (

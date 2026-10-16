@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Inspect the actual .flatpak file, catching missing installer information."""
+"""Check the metadata and icons embedded in a Flatpak bundle."""
 
 import argparse
 import gzip

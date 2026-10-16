@@ -1,4 +1,4 @@
-"""Install and manage the system daemon through an explicit administrator prompt."""
+"""Host service installation and removal."""
 
 import os
 from pathlib import Path
@@ -15,7 +15,6 @@ INSTALLED_HELPER = Path("/usr/local/libexec/victus-fan-control/helper")
 
 
 def is_service_active(socket_path: Path = DAEMON_SOCKET) -> bool:
-    """Check the host service, with a bound on synchronous status queries."""
     try:
         cmd = host_command_argv("systemctl", "is-active", "--quiet", "victus-fan-control.service")
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
@@ -25,7 +24,6 @@ def is_service_active(socket_path: Path = DAEMON_SOCKET) -> bool:
 
 
 def service_unit_content(helper_path: Path = INSTALLED_HELPER, allowed_uid: int | None = None) -> str:
-    """Only a root-owned installed executable may be used by the persistent unit."""
     uid = os.getuid() if allowed_uid is None else allowed_uid
     if type(uid) is not int or not 0 <= uid < 2**32:
         raise ValueError("Invalid authorized user ID.")
@@ -50,7 +48,7 @@ def service_unit_content(helper_path: Path = INSTALLED_HELPER, allowed_uid: int 
 
 def installation_script(helper: Path, allowed_uid: int, unit_path: Path = UNIT_PATH,
                         installed_helper: Path = INSTALLED_HELPER) -> str:
-    """Stage root-owned files atomically; never execute from a user deployment."""
+    """Copy the helper into a root-owned directory before starting the service."""
     quote = shlex.quote
     content = service_unit_content(installed_helper, allowed_uid)
     directory = quote(str(installed_helper.parent))

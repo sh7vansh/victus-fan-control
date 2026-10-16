@@ -22,10 +22,6 @@ def run(*args):
 
 
 def flatpak(test=False, signing_key=None, gpg_homedir=None):
-    """Build the static helper locally, then stage the app using the Platform.
-
-    The flatpak-builder manifest instead uses the GNOME SDK and Go extension.
-    """
     manifest = json.loads((SOURCE / f"{APP_ID}.json").read_text())
     build = SOURCE / "build"
     build.mkdir(exist_ok=True)

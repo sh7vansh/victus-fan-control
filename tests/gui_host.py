@@ -1,4 +1,4 @@
-"""GTK host-backend integration against temporary files; never invokes pkexec."""
+"""GTK integration tests for the host backend."""
 
 from pathlib import Path
 import sys

@@ -35,7 +35,7 @@ for name in ("name", "version", "license", "origin", "size-download"):
     print(f"{name}: {field(name) or '(missing)'}")
 if field("license") != "MIT":
     raise SystemExit("FAIL: GNOME Software does not recognize the MIT license. Use the repository-backed .flatpakref.")
-# Check the actual cached image data, not merely the presence of an icon field.
+# Compare the cached icon with the source artwork.
 source_icons = SOURCE / "data/icons/hicolor"
 expected_icons = {sha256(path.read_bytes()).digest() for path in source_icons.glob("*/apps/*.png")}
 icon_paths = [Path(value.strip()) for value in re.findall(r"^icon:\s*(/.+)$", app, re.MULTILINE)]

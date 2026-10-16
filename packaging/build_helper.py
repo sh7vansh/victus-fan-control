@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Build a self-contained Linux helper using only Go's standard library."""
+"""Build and test the static Go helper."""
 
 import argparse
 import os

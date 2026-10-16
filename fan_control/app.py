@@ -1,4 +1,4 @@
-"""GTK 4 / libadwaita interface. Run with the system Python for PyGObject."""
+"""GTK 4 / libadwaita interface."""
 
 import argparse
 from pathlib import Path
@@ -277,7 +277,7 @@ class FanWindow(Adw.ApplicationWindow):
         self.begin_write(request, "Max fan speed enabled" if row.get_active() else "Automatic fan control restored")
 
     def begin_write(self, request, success_message):
-        # Revert the widget to the hardware state until authorization/write succeeds.
+        # Show the last known hardware state until the write succeeds.
         self.refresh()
         self.busy = True
         self.update_authorization()

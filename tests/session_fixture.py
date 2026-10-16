@@ -1,8 +1,4 @@
-"""Use the compiled test executable against temporary sysfs, without pkexec.
-
-Its alternate root and error injection exist only in Go _test.go code, which is
-absent from the production executable installed in the Flatpak.
-"""
+"""Run the separate Go test helper against temporary sysfs files."""
 
 from pathlib import Path
 import subprocess
@@ -24,8 +20,6 @@ def fixture_argv(root, idle_seconds=20, mode="session", value=None):
 
 
 class FixtureDaemon:
-    """Run the real socket protocol against Go's fixture-only sysfs backend."""
-
     def __init__(self, root, launched):
         self.socket_path = root / "daemon.sock"
         self.process = subprocess.Popen(

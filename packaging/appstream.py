@@ -12,9 +12,8 @@ from project import APP_ID
 
 
 def compose_mirrored(prefix, base_url):
-    """Use AppStream's full composer for repositories that host their media."""
     prefix = Path(prefix).resolve()
-    # The lightweight local catalog must not coexist with the mirrored one.
+    # Export one catalog, replacing the copy made for local builds.
     (prefix / "share/app-info/xmls" / f"{APP_ID}.xml.gz").unlink(missing_ok=True)
     subprocess.run([
         "appstreamcli", "compose", "--prefix=/", "--origin=flatpak",

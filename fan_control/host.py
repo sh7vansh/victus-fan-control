@@ -1,4 +1,4 @@
-"""Flatpak host bridge. Read and verify as the user; writes use the system daemon."""
+"""Read host hardware from Flatpak through the bundled helper."""
 
 import json
 from pathlib import Path
@@ -93,7 +93,7 @@ class HostHardware:
 
     @staticmethod
     def read_command(argv, finished, timeout_ms=3000):
-        """Bounded async user-level read; the GTK main loop never waits on it."""
+        """Read in a subprocess so GTK stays responsive."""
         flags = Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
         try:
             process = Gio.Subprocess.new(argv, flags)

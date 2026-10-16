@@ -1,6 +1,6 @@
 # Fan Control
 
-A GTK 4 / libadwaita app for supported HP Victus and OMEN laptops on Linux. Choose a thermal profile, toggle maximum fan speed, and monitor both fans' RPM.
+Fan controls for HP Victus and OMEN laptops on Linux, built with GTK 4 and libadwaita.
 
 <p>
   <img src="data/screenshots/fan-control-light.png" alt="Light appearance" width="280">
@@ -16,23 +16,19 @@ flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control
 flatpak run io.github.sh7vansh.victus-fan-control
 ```
 
-Select **Enable Service**, authenticate, and restart the app when prompted. Requires compatible HP firmware, `hp-wmi`, systemd, and polkit.
+Choose **Enable Service**, authenticate, and restart when prompted. Requires supported HP firmware, `hp-wmi`, systemd, and polkit. The app runs commands on the host, which GNOME Software labels “Potentially Unsafe.”
 
-On GNOME, the first launch assigns the **OMEN button** to open Fan Control if the key is unassigned. Change or disable it in Settings → Keyboard → Custom Shortcuts.
+## Controls
 
-## Use
+- Choose Quiet, Cool, Balanced, or Performance where supported by firmware.
+- Toggle maximum fan speed or return to automatic control.
+- Monitor both fans' RPM, refreshed every second.
 
-- **Thermal profile:** choose Quiet, Cool, Balanced, or Performance where supported.
-- **Max fan speed:** turn on for maximum cooling; turn off for automatic control.
-- **RPM:** both fan readings refresh every second.
+**Maximum fan speed stays active after closing.** Turn it off to restore automatic cooling.
 
-**Closing the app leaves settings active.** Turn off maximum fan speed to restore automatic cooling.
+On GNOME, the OMEN button opens the app if the key was unassigned. Change it in Settings → Keyboard → Custom Shortcuts.
 
-## How it works
-
-The Python UI reads Linux hardware interfaces; a root-owned Go service applies changes through a private local socket. Supported profile changes also try to update GNOME's power mode. No custom fan curves or exact RPM targets.
-
-The Flatpak can run commands as your host user, so GNOME Software labels it **“Potentially Unsafe.”** After app updates, choose **Background Service… → Update Service** and restart the app.
+After updating, choose **Background Service… → Update Service** and restart. Before uninstalling, choose **Disable Service** to remove the host service.
 
 ## Development
 
@@ -43,14 +39,6 @@ On Fedora, install `python3-gobject gtk4 libadwaita polkit golang`, then run:
 /usr/bin/python3 -m fan_control
 ```
 
-Use `--demo` for a preview without hardware access. See [packaging details](packaging/README.md) for builds, tests, and service permissions.
+Use `--demo` to preview with simulated readings. See [packaging](packaging/README.md) for builds, tests, and releases.
 
-## Uninstall
-
-Choose **Background Service… → Disable Service** first, then run:
-
-```sh
-flatpak uninstall --user io.github.sh7vansh.victus-fan-control
-```
-
-[Report a problem](https://github.com/sh7vansh/victus-fan-control/issues) · [MIT license](LICENSE) · [Go runtime license](data/licenses/Go-LICENSE)
+[Issues](https://github.com/sh7vansh/victus-fan-control/issues) · [MIT license](LICENSE) · [Go runtime license](data/licenses/Go-LICENSE)
