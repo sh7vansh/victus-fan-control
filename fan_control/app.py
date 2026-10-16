@@ -15,6 +15,12 @@ from . import __version__
 from .authorization import AuthenticationCancelled, AuthorizationSession
 from .hardware import DemoHardware, Hardware, PROFILES
 from .host import HostHardware
+from .power_profiles import (
+    is_live_hardware,
+    subscribe_desktop_changes,
+    sync_to_desktop,
+    unsubscribe_desktop_changes,
+)
 
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
@@ -80,6 +86,9 @@ class FanWindow(Adw.ApplicationWindow):
         self.lock_action = Gio.SimpleAction.new("lock-controls", None)
         self.lock_action.connect("activate", lambda *_: self.authorization.close())
         self.add_action(self.lock_action)
+        self.desktop_sync_id = None
+        if is_live_hardware(hardware):
+            self.desktop_sync_id = subscribe_desktop_changes(self._on_desktop_profile_change)
         self.connect("close-request", self.on_close)
 
         toolbar = Adw.ToolbarView()
@@ -303,6 +312,8 @@ class FanWindow(Adw.ApplicationWindow):
                 self.spinner.set_spinning(False)
                 self.refresh()
                 self.toast_overlay.add_toast(Adw.Toast(title=message))
+                if is_live_hardware(self.hardware) and request.path.name == "platform_profile":
+                    sync_to_desktop(request.value)
             self.hardware.verify_async(request, verified)
             return GLib.SOURCE_REMOVE
         try:
@@ -312,9 +323,14 @@ class FanWindow(Adw.ApplicationWindow):
             self.spinner.set_spinning(False)
             self.refresh()
             self.toast_overlay.add_toast(Adw.Toast(title=message))
+            if is_live_hardware(self.hardware) and request.path.name == "platform_profile":
+                sync_to_desktop(request.value)
         except ValueError as error:
             self.fail(str(error))
         return GLib.SOURCE_REMOVE
+
+    def _on_desktop_profile_change(self, _firmware_profile):
+        GLib.timeout_add(150, self.refresh)
 
     def fail(self, detail):
         self.busy = False
@@ -343,6 +359,9 @@ class FanWindow(Adw.ApplicationWindow):
             self.toast_overlay.add_toast(Adw.Toast(title="Finish or cancel authentication before closing"))
             return True
         GLib.source_remove(self.poll_source)
+        if self.desktop_sync_id is not None:
+            unsubscribe_desktop_changes(self.desktop_sync_id)
+            self.desktop_sync_id = None
         if self.authorization is not None:
             self.authorization.close()
         return False
