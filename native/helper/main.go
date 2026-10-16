@@ -4,6 +4,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -273,40 +274,88 @@ func serve(input io.Reader, output io.Writer, c changer, timeout time.Duration) 
 	}
 }
 
-func runDaemon(socketPath string, c controls) error {
-	_ = os.Remove(socketPath)
-	listener, err := net.Listen("unix", socketPath)
+// Peer credentials come from the kernel, never from a client protocol field.
+func authorizePeer(conn *net.UnixConn, allowedUID uint32) error {
+	raw, err := conn.SyscallConn()
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = listener.Close()
-		_ = os.Remove(socketPath)
-	}()
-	_ = os.Chmod(socketPath, 0666)
+	var cred *syscall.Ucred
+	var socketErr error
+	if err := raw.Control(func(fd uintptr) {
+		cred, socketErr = syscall.GetsockoptUcred(int(fd), syscall.SOL_SOCKET, syscall.SO_PEERCRED)
+	}); err != nil {
+		return err
+	}
+	if socketErr != nil {
+		return socketErr
+	}
+	if cred == nil || (cred.Uid != allowedUID && cred.Uid != 0) {
+		return errors.New("This user is not authorized to control cooling.")
+	}
+	return nil
+}
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+func runDaemon(ctx context.Context, socketPath string, c changer, allowedUID uint32) error {
+	// The production socket is in root-owned /run. Refuse to remove other files.
+	if info, err := os.Lstat(socketPath); err == nil {
+		if info.Mode()&os.ModeSocket == 0 {
+			return errors.New("Socket path is not a socket.")
+		}
+		if err := os.Remove(socketPath); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: socketPath, Net: "unix"})
+	if err != nil {
+		return err
+	}
+	defer listener.Close()
+	// Restrict the socket before assigning ownership to the selected user.
+	if err := os.Chmod(socketPath, 0600); err != nil {
+		return err
+	}
+	if os.Geteuid() == 0 {
+		if err := os.Chown(socketPath, int(allowedUID), -1); err != nil {
+			return err
+		}
+	} else if allowedUID != uint32(os.Geteuid()) {
+		return errors.New("Cannot assign socket to another user without root.")
+	}
+	done := make(chan struct{})
+	defer close(done)
 	go func() {
-		<-sigChan
-		_ = listener.Close()
-		_ = os.Remove(socketPath)
-		os.Exit(0)
+		select {
+		case <-ctx.Done():
+			listener.Close()
+		case <-done:
+		}
 	}()
-
 	for {
-		conn, err := listener.Accept()
+		conn, err := listener.AcceptUnix()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
 			return err
 		}
-		go func(nc net.Conn) {
+		if err := authorizePeer(conn, allowedUID); err != nil {
+			conn.Close()
+			continue
+		}
+		go func(nc *net.UnixConn) {
 			defer nc.Close()
 			_ = serve(nc, nc, c, 0)
 		}(conn)
 	}
+}
+
+func daemon(socketPath string, c controls, allowedUID uint32) error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	return runDaemon(ctx, socketPath, c, allowedUID)
 }
 
 func run(args []string, input io.Reader, output io.Writer, c controls, uid int) error {
@@ -326,23 +375,28 @@ func run(args []string, input io.Reader, output io.Writer, c controls, uid int) 
 			if uid != 0 {
 				return errors.New("Administrator authentication is required to run the daemon.")
 			}
-			return runDaemon(defaultSocketPath, c)
+			return daemon(defaultSocketPath, c, 0)
 		}
 	}
 	if len(args) == 2 {
 		switch args[0] {
-		case "--daemon":
-			if uid != 0 {
-				return errors.New("Administrator authentication is required to run the daemon.")
-			}
-			return runDaemon(args[1], c)
 		case "--verify-profile":
 			return c.verify("profile", args[1])
 		case "--verify-fan":
 			return c.verify("fan", args[1])
 		}
 	}
-	return errors.New("Expected --snapshot, --session, --daemon, --version, --verify-profile VALUE, or --verify-fan VALUE.")
+	if len(args) == 3 && args[0] == "--daemon" && args[1] == "--allow-uid" {
+		if uid != 0 {
+			return errors.New("Administrator authentication is required to run the daemon.")
+		}
+		allowedUID, err := strconv.ParseUint(args[2], 10, 32)
+		if err != nil {
+			return errors.New("Invalid authorized user ID.")
+		}
+		return daemon(defaultSocketPath, c, uint32(allowedUID))
+	}
+	return errors.New("Expected --snapshot, --session, --daemon [--allow-uid UID], --version, --verify-profile VALUE, or --verify-fan VALUE.")
 }
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout, controls{root: "/sys"}, os.Geteuid()); err != nil {

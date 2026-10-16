@@ -3,6 +3,7 @@
 from pathlib import Path
 import sys
 import tempfile
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -78,14 +79,15 @@ class HostApplication(FanApplication):
                 w.maximum.set_active(False)
             elif self.stage == 3:
                 assert w.snapshot.mode == 2 and not w.maximum.get_active()
-                assert len(self.launches) == 1, "Repeated changes authenticated more than once"
-                w.lock_action.activate(None)
+                assert len(self.launches) == 1, "Repeated changes started more than one daemon"
+                w.authorization.close()
                 assert not w.authorization.unlocked
-                self.command = "cancel"
+                self.command = "reject"
                 w.maximum.set_active(True)
             elif self.stage == 4:
                 assert w.snapshot.mode == 2 and not w.maximum.get_active()
-                assert not w.error_banner.get_revealed()
+                assert w.error_banner.get_revealed()
+                assert w.authorization.unlocked, "Client did not reconnect to daemon"
                 self.command = "reject"
                 w.profile_buttons["performance"].set_active(True)
             elif self.stage == 5:
@@ -96,7 +98,7 @@ class HostApplication(FanApplication):
             else:
                 assert w.error_banner.get_revealed() and "did not stay applied" in w.error_detail
                 assert w.snapshot.profile == "quiet" and w.profile_buttons["quiet"].get_active()
-                print("GTK host integration passed: async reads, profile, max/auto, cancellation, failed writes, and host readback", flush=True)
+                print("GTK host integration passed: async reads, profile, max/auto, reconnection, failed writes, and host readback", flush=True)
                 w.close()
                 return GLib.SOURCE_REMOVE
             self.stage += 1
@@ -114,7 +116,11 @@ fixture.setUp()
 (fixture.root / "not-executable").write_text("not executable\n")
 try:
     app = HostApplication(fixture)
-    result = app.run([sys.argv[0]])
+    # Fixture HostHardware must never change the real desktop power profile.
+    with patch("fan_control.app.sync_to_desktop"), patch("fan_control.app.subscribe_desktop_changes"):
+        result = app.run([sys.argv[0]])
 finally:
+    if hasattr(app, "window"):
+        app.window.authorization.fixture_daemon.close()
     fixture.doCleanups()
 raise SystemExit(1 if app.failure else result)

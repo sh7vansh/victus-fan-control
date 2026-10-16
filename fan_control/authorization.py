@@ -31,8 +31,10 @@ class AuthorizationSession:
         self.deadline = 0
         self.writing = False
         self._token = object()
+        self.connecting = False
+        self.cancellable = None
         if self.socket_path and self.socket_path.exists():
-            self._connect()
+            self.connect()
 
     @property
     def is_daemon(self):
@@ -54,27 +56,28 @@ class AuthorizationSession:
         if self.unlocked:
             self._send_change()
             return
-        if self.connection is not None:
+        if self.connection is not None or self.connecting:
             return
         if self.socket_path and self.socket_path.exists():
-            self._connect()
+            self.connect()
             return
         self._fail(ServiceUnavailable("The fan-control background service is not running."))
 
-    def _connect(self):
-        if not self.socket_path:
+    def connect(self):
+        """Connect once, bounding both connection and protocol greeting time."""
+        if not self.socket_path or self.connection is not None or self.connecting:
             return
+        self.connecting = True
+        self.cancellable = Gio.Cancellable.new()
+        self._start_deadline()
         client = Gio.SocketClient.new()
         address = Gio.UnixSocketAddress.new(str(self.socket_path))
         token = object()
         self._token = token
         try:
-            client.connect_async(address, None, self._on_connected, token)
+            client.connect_async(address, self.cancellable, self._on_connected, token)
         except (GLib.Error, OSError) as error:
-            self.connection = None
-            self.unlocked = False
-            if self.pending:
-                self._fail(ServiceUnavailable(f"Cannot connect to background service: {error}"))
+            self._fail(ServiceUnavailable(f"Cannot connect to background service: {error}"))
 
     def _on_connected(self, client, result, token):
         if token is not self._token:
@@ -86,15 +89,13 @@ class AuthorizationSession:
             return
         try:
             self.connection = client.connect_finish(result)
+            self.connecting = False
             self.input = Gio.DataInputStream.new(self.connection.get_input_stream())
             self.input.set_newline_type(Gio.DataStreamNewlineType.LF)
             self.output_stream = self.connection.get_output_stream()
             self._read(self.connection)
         except (GLib.Error, OSError) as error:
-            self.connection = None
-            self.unlocked = False
-            if self.pending:
-                self._fail(ServiceUnavailable(f"Cannot connect to background service: {error}"))
+            self._fail(ServiceUnavailable(f"Cannot connect to background service: {error}"))
 
     def _read(self, connection):
         if self.input:
@@ -112,6 +113,9 @@ class AuthorizationSession:
             if not self.unlocked:
                 if message != {"ready": True}:
                     raise ValueError("The fan-control service protocol did not start correctly.")
+                if self.deadline:
+                    GLib.source_remove(self.deadline)
+                    self.deadline = 0
                 self.unlocked = True
                 self.changed()
                 self._send_change()
@@ -131,8 +135,13 @@ class AuthorizationSession:
     def _send_change(self):
         if self.pending is None:
             return
-        self.deadline = GLib.timeout_add(self.reply_timeout_ms, self._timed_out)
+        self._start_deadline()
         self._write(self.pending[0])
+
+    def _start_deadline(self):
+        if self.deadline:
+            GLib.source_remove(self.deadline)
+        self.deadline = GLib.timeout_add(self.reply_timeout_ms, self._timed_out)
 
     def _write(self, message):
         connection = self.connection
@@ -183,14 +192,17 @@ class AuthorizationSession:
         return GLib.SOURCE_REMOVE
 
     def _fail(self, error):
-        self.close()
-        self._finish(error)
+        self.close(error)
 
-    def close(self):
+    def close(self, error=None):
         if self.deadline:
             GLib.source_remove(self.deadline)
             self.deadline = 0
         self._token = object()
+        self.connecting = False
+        if self.cancellable:
+            self.cancellable.cancel()
+            self.cancellable = None
         connection, self.connection = self.connection, None
         self.output_stream = None
         self.input = None
@@ -202,3 +214,4 @@ class AuthorizationSession:
             except GLib.Error:
                 pass
         self.changed()
+        self._finish(error or ServiceUnavailable("The fan-control connection was closed."))

@@ -47,7 +47,7 @@ The signed repository and `.flatpakref` are now the primary distribution. They s
 
 The separate `.flatpak` remains useful for offline transfer but can still show incomplete details in GNOME Software 50.4. Use the reference when viewing the complete installer listing.
 
-“Potentially Unsafe / Can acquire arbitrary permissions” remains correct: the selected host-command design permits commands outside the sandbox. Signing and metadata do not remove that permission. A narrower design would require a separately installed host service, which this package does not use.
+“Potentially Unsafe / Can acquire arbitrary permissions” remains correct: the selected host-command design permits commands outside the sandbox. Signing and metadata do not remove that permission. The current cooling-write path uses a host service, but read-only discovery and service management still use the host-command permission.
 
 ## Icon and screenshot refresh after installation
 
@@ -66,3 +66,7 @@ Real polkit startup and EOF shutdown were tested on the Fedora target using only
 Discovery, readback, and session changes now use the bundled statically linked Go helper. The Python privileged helper and host Python/cat commands are removed. Earlier Python dependency and interpreter command examples in historical release notes/research describe releases through 1.1.0. Current Flatpak users need polkit and the relevant kernel/firmware interfaces on the host; GTK/Python run inside the Flatpak runtime.
 
 The helper executes from the host deployment path recorded by Flatpak, with no separate RPM or service. Its architecture follows the Flatpak architecture and it has no dynamic loader dependency. Go fixture-only flags are compiled exclusively into a separate test executable which is never packaged.
+
+## Current system service architecture
+
+The session and deployment descriptions in the historical 1.1.0/1.2.0 sections above do not describe the current app. Cooling writes now require a root-owned installed daemon. Its socket is restricted to the enabling account and root. Use Update Service to migrate an older installation, restart Flatpak after service changes, and Disable Service before uninstalling. See [packaging details](README.md) for current dependencies and lifecycle.

@@ -5,7 +5,8 @@ absent from the production executable installed in the Flatpak.
 """
 
 from pathlib import Path
-import sys
+import subprocess
+import time
 
 from fan_control.authorization import AuthorizationSession
 
@@ -22,11 +23,34 @@ def fixture_argv(root, idle_seconds=20, mode="session", value=None):
     return argv
 
 
-def fixture_session(root, launched):
-    def argv():
+class FixtureDaemon:
+    """Run the real socket protocol against Go's fixture-only sysfs backend."""
+
+    def __init__(self, root, launched):
+        self.socket_path = root / "daemon.sock"
+        self.process = subprocess.Popen(
+            [str(TEST_HELPER), "--", "daemon", str(root), str(self.socket_path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         launched.append(True)
-        mode_path = root / "test-command"
-        if mode_path.exists() and mode_path.read_text() == "cancel":
-            return [sys.executable, "-I", "-c", "raise SystemExit(126)"]
-        return fixture_argv(root)
-    return AuthorizationSession(argv_factory=argv)
+        for _ in range(200):
+            if self.socket_path.exists():
+                break
+            if self.process.poll() is not None:
+                raise RuntimeError(self.process.stderr.read().decode())
+            time.sleep(0.01)
+        else:
+            self.close()
+            raise RuntimeError("Fixture daemon did not start")
+
+    def close(self):
+        if self.process.poll() is None:
+            self.process.terminate()
+        self.process.wait(timeout=5)
+        self.process.stderr.close()
+
+
+def fixture_session(root, launched):
+    daemon = FixtureDaemon(root, launched)
+    session = AuthorizationSession(socket_path=daemon.socket_path)
+    session.fixture_daemon = daemon
+    return session

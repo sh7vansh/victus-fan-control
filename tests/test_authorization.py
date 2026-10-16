@@ -14,7 +14,7 @@ from gi.repository import GLib
 from fan_control.authorization import AuthorizationSession, ServiceUnavailable
 from fan_control.hardware import WriteRequest
 import test_hardware
-from session_fixture import fixture_argv, ROOT
+from session_fixture import fixture_argv, fixture_session, ROOT
 from fan_control.native import host_helper_path
 
 
@@ -100,6 +100,43 @@ class AuthorizationTests(unittest.TestCase):
         err = self.change_with_session(session, "quiet")
         self.assertIsInstance(err, ServiceUnavailable)
         self.assertIn("not running", str(err))
+
+    def test_real_fixture_daemon_writes_and_reconnects(self):
+        launched = []
+        session = fixture_session(self.fixture.root, launched)
+        self.addCleanup(session.fixture_daemon.close)
+        self.addCleanup(session.close)
+        # Exercise the constructor's in-flight connect without a preparatory spin.
+        self.assertIsNone(self.change_with_session(session, "quiet"))
+        self.assertEqual(self.fixture.hardware.read().profile, "quiet")
+        session.close()
+        self.assertIsNone(self.change_with_session(session, "0", "pwm1_enable"))
+        self.assertEqual(self.fixture.hardware.read().mode, 0)
+        self.assertEqual(launched, [True])
+
+    def test_silent_daemon_greeting_times_out_and_close_completes_pending(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "silent.sock"
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                server.bind(str(path))
+                server.listen(2)
+                session = AuthorizationSession(socket_path=path, reply_timeout_ms=50)
+                self.addCleanup(session.close)
+                # A listening socket accepts connections but never sends its greeting.
+                error = self.change_with_session(session, "quiet")
+                self.assertIn("Timed out", str(error))
+                self.assertFalse(session.unlocked)
+                self.assertIsNone(session.pending)
+                self.assertIsNone(session.connection)
+
+                session.connect()
+                results = []
+                session.change(WriteRequest(Path("platform_profile"), "quiet"), results.append)
+                session.close()
+                self.spin(20)
+                self.assertEqual(len(results), 1)
+                self.assertIsInstance(results[0], ServiceUnavailable)
+                self.assertIsNone(session.pending)
 
     def test_daemon_socket_connection_refused_fails_with_service_unavailable(self):
         sock_dir = tempfile.mkdtemp()

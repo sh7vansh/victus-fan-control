@@ -63,13 +63,13 @@ class IntegrationApplication(FanApplication):
             elif self.stage == 4:
                 assert w.error_banner.get_revealed(), "Failed subprocess not reported"
                 assert w.snapshot.profile == "cool" and w.profile_buttons["cool"].get_active()
-                assert len(self.launches) == 1, "Repeated changes authenticated more than once"
-                w.lock_action.activate(None)
+                assert len(self.launches) == 1, "Repeated changes started more than one daemon"
+                w.authorization.close()
                 assert not w.authorization.unlocked
-                self.command = "cancel"
+                self.command = "reject"
                 w.maximum.set_active(True)
             elif self.stage == 5:
-                assert not w.error_banner.get_revealed(), "Cancellation should be informational"
+                assert w.error_banner.get_revealed(), "Daemon rejection should be reported"
                 assert w.snapshot.mode == 2 and not w.maximum.get_active()
                 self.command = "ignore"
                 w.profile_buttons["balanced"].set_active(True)
@@ -86,7 +86,7 @@ class IntegrationApplication(FanApplication):
                 assert all(card.value.get_label() == "—" for card in w.fans)
                 assert not w.maximum.get_sensitive()
                 assert all(not row.get_sensitive() for row in w.profile_rows.values())
-                print("GTK integration passed: async writes, max/auto mapping, external changes, failure, cancellation, readback rejection, and missing hardware", flush=True)
+                print("GTK integration passed: async writes, max/auto mapping, external changes, failure, reconnection, readback rejection, and missing hardware", flush=True)
                 w.close()
                 return GLib.SOURCE_REMOVE
             self.stage += 1
@@ -114,5 +114,9 @@ with tempfile.TemporaryDirectory(prefix="fan-control-test-") as directory:
     for name, value in {"name": "hp", "fan1_input": "0", "fan2_input": "2576", "pwm1_enable": "2"}.items():
         (controller / name).write_text(value + "\n")
     app = IntegrationApplication(root)
-    result = app.run([sys.argv[0]])
+    try:
+        result = app.run([sys.argv[0]])
+    finally:
+        if hasattr(app, "window"):
+            app.window.authorization.fixture_daemon.close()
     raise SystemExit(1 if app.failure else result)

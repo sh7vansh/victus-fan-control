@@ -15,7 +15,7 @@
       <li>Toggle full-speed fan bursts or return to automatic firmware control</li>
       <li>Monitor real-time CPU and GPU fan RPM</li>
     </ul>
-    <p>Requires HP firmware and polkit. Changes authenticate once per session; hardware settings remain in firmware when closed.</p>
+    <p>Requires HP firmware, systemd, polkit, and coreutils. Enable the background service with administrator authentication; cooling changes then use a socket restricted to your account. Hardware settings remain in firmware when closed.</p>
   </description>
   <url type="homepage">https://sh7vansh.github.io/victus-fan-control/</url>
   <url type="vcs-browser">https://github.com/sh7vansh/victus-fan-control</url>
@@ -38,6 +38,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.1" date="2026-10-17">
+      <description><p>Secure the background service with a root-owned helper and user-restricted socket. Repair service setup, bound connection waits, and add an Update Service action for existing installations.</p></description>
+    </release>
     <release version="1.4.0" date="2026-10-17">
       <description><p>Add background system service daemon mode and UNIX socket support for optional passwordless fan control.</p></description>
     </release>

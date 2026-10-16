@@ -1,4 +1,4 @@
-"""Flatpak host bridge. Read as the user; authenticate only sysfs writes."""
+"""Flatpak host bridge. Read and verify as the user; writes use the system daemon."""
 
 import json
 from pathlib import Path

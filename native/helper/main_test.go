@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,9 +11,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -29,6 +32,13 @@ func TestMain(m *testing.M) {
 		c := controls{root: root}
 		var err error
 		switch mode {
+		case "daemon":
+			if len(args) != 3 {
+				os.Exit(2)
+			}
+			ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+			defer stop()
+			err = runDaemon(ctx, args[2], fixtureControls{c}, uint32(os.Getuid()))
 		case "session":
 			if len(args) != 3 {
 				os.Exit(2)
@@ -232,6 +242,48 @@ func TestProductionCLIRejectsAlternativeRootsAndUnprivilegedSessions(t *testing.
 	}
 }
 
+func TestDaemonChecksKernelPeerIdentity(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "peer.sock")
+	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	client, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	peer, err := listener.AcceptUnix()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer peer.Close()
+	if err := authorizePeer(peer, uint32(os.Getuid())); err != nil {
+		t.Fatalf("Own UID denied: %v", err)
+	}
+	if os.Getuid() != 0 && authorizePeer(peer, uint32(os.Getuid()+1)) == nil {
+		t.Fatal("Another user's peer accepted")
+	}
+}
+
+func TestDaemonRefusesNonSocketPathAndInvalidUID(t *testing.T) {
+	c := fixture(t)
+	path := filepath.Join(t.TempDir(), "unrelated-file")
+	os.WriteFile(path, []byte("keep"), 0600)
+	if runDaemon(context.Background(), path, c, uint32(os.Getuid())) == nil {
+		t.Fatal("Replaced unrelated file with socket")
+	}
+	if value := text(path); value == nil || *value != "keep" {
+		t.Fatal("Unrelated file changed")
+	}
+	for _, uid := range []string{"-1", "4294967296", "invalid"} {
+		if run([]string{"--daemon", "--allow-uid", uid}, strings.NewReader(""), io.Discard, c, 0) == nil {
+			t.Fatalf("Accepted invalid UID: %s", uid)
+		}
+	}
+}
+
 func TestDaemonServerAndRejectsUnprivileged(t *testing.T) {
 	c := fixture(t)
 	if err := run([]string{"--daemon"}, strings.NewReader(""), io.Discard, c, 1000); err == nil {
@@ -239,9 +291,10 @@ func TestDaemonServerAndRejectsUnprivileged(t *testing.T) {
 	}
 
 	sockPath := filepath.Join(t.TempDir(), "test.sock")
-	go func() {
-		_ = runDaemon(sockPath, c)
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	completed := make(chan error, 1)
+	go func() { completed <- runDaemon(ctx, sockPath, c, uint32(os.Getuid())) }()
 
 	var conn net.Conn
 	var err error
@@ -256,6 +309,10 @@ func TestDaemonServerAndRejectsUnprivileged(t *testing.T) {
 		t.Fatalf("Could not connect to daemon socket: %v", err)
 	}
 	defer conn.Close()
+	info, err := os.Stat(sockPath)
+	if err != nil || info.Mode().Perm() != 0600 {
+		t.Fatalf("Socket must be private: %v, %v", info, err)
+	}
 
 	reader := bufio.NewReader(conn)
 	greeting, err := reader.ReadBytes('\n')
@@ -279,6 +336,10 @@ func TestDaemonServerAndRejectsUnprivileged(t *testing.T) {
 		t.Fatalf("Unexpected daemon reply: %+v", resp)
 	}
 	if err := c.verify("profile", "quiet"); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	if err := <-completed; err != nil {
 		t.Fatal(err)
 	}
 }

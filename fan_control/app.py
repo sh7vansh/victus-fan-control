@@ -12,7 +12,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
 from . import __version__
-from .authorization import AuthorizationSession, ServiceUnavailable
+from .authorization import AuthorizationSession
 from .hardware import DemoHardware, Hardware, PROFILES
 from .host import HostHardware
 from .power_profiles import (
@@ -93,11 +93,10 @@ class FanWindow(Adw.ApplicationWindow):
         self.busy = False
         self.syncing = False
         self.error_detail = ""
-        self.authorization = None if isinstance(hardware, DemoHardware) else AuthorizationSession()
-        if self.authorization is not None:
+        self.authorization = None
+        if not isinstance(hardware, DemoHardware):
             factory = getattr(application, "authorization_factory", None)
-            if factory:
-                self.authorization = factory()
+            self.authorization = factory() if factory else AuthorizationSession()
             self.authorization.changed = self.update_authorization
         self.service_action = Gio.SimpleAction.new("manage-service", None)
         self.service_action.connect("activate", self.on_manage_service)
@@ -305,7 +304,7 @@ class FanWindow(Adw.ApplicationWindow):
 
     def update_authorization(self):
         unlocked = self.authorization is not None and self.authorization.unlocked
-        active = is_service_active()
+        active = False if isinstance(self.hardware, DemoHardware) else is_service_active()
         if hasattr(self, "service_banner"):
             self.service_banner.set_revealed(not active and not isinstance(self.hardware, DemoHardware))
         if hasattr(self, "auth"):
@@ -331,10 +330,11 @@ class FanWindow(Adw.ApplicationWindow):
             status_text = "Inactive"
         dialog = Adw.AlertDialog.new(
             "Background Service",
-            f"Running the fan control daemon as a background service allows changing fan speeds and thermal profiles without requiring password authentication each session.\n\nStatus: {status_text}"
+            f"Enable the system service to change cooling settings without repeated authentication. Only your user account and root can connect. Update Service refreshes the installed helper after an app update.\n\nStatus: {status_text}"
         )
         dialog.add_response("cancel", "Cancel")
         if active:
+            dialog.add_response("install", "Update Service")
             dialog.add_response("uninstall", "Disable Service")
             dialog.set_response_appearance("uninstall", Adw.ResponseAppearance.DESTRUCTIVE)
         else:
@@ -358,14 +358,14 @@ class FanWindow(Adw.ApplicationWindow):
             return
         if self.authorization:
             self.authorization.close()
-            if self.authorization.socket_path and self.authorization.socket_path.exists():
-                self.authorization._connect_socket()
+            if not FLATPAK_INFO.exists():
+                self.authorization.connect()
         self.update_authorization()
-        socket_visible = self.authorization and self.authorization.socket_path and self.authorization.socket_path.exists()
-        if FLATPAK_INFO.exists() and not socket_visible:
+        # Flatpak may still bind the previous socket inode after a service restart.
+        if FLATPAK_INFO.exists():
             dialog = Adw.AlertDialog.new(
                 "Restart Required",
-                "The background service is now installed and active on your system.\n\nRestart the application to switch to passwordless fan control."
+                "The background service is now installed and active on your system.\n\nRestart the application to connect to its new socket."
             )
             dialog.add_response("later", "Restart Later")
             dialog.add_response("restart", "Restart Now")

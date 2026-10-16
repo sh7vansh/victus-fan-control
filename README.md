@@ -16,9 +16,9 @@ flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control
 flatpak run io.github.sh7vansh.VictusFanControl
 ```
 
-The app uses `flatpak-spawn --host` and the host's `pkexec`; no separate RPM or service is required. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Fan changes require administrator authentication once per app session. See [packaging details](packaging/README.md).
+The app uses `flatpak-spawn --host` to read hardware and configure a systemd service. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Select **Enable Service** on first use and authenticate through polkit. Cooling changes then use a local socket without repeated prompts. See [packaging details](packaging/README.md).
 
-Requires supported HP firmware, Flatpak, polkit (`pkexec`), and a graphical authentication agent on the host. A static Go helper is bundled; host Python, Go, and coreutils are not required by the app. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
+Requires supported HP firmware, Flatpak, systemd, polkit (`pkexec`), coreutils, and a graphical authentication agent on the host. The static Go helper is bundled; host Python and Go are not required. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
 
 [Project page](https://sh7vansh.github.io/victus-fan-control/) · [Releases](https://github.com/sh7vansh/victus-fan-control/releases) · [Report a problem](https://github.com/sh7vansh/victus-fan-control/issues)
 
@@ -39,7 +39,7 @@ For source development, also install Go 1.22+ and build the helper. Flatpak user
 /usr/bin/python3 -m fan_control
 ```
 
-Source runs use the same temporary session helper directly on the host. Tested with GTK 4.22 and libadwaita 1.9.
+Source runs use the same system service. Enable it from the app after building the helper. Tested with GTK 4.22 and libadwaita 1.9.
 
 ## What the controls do
 
@@ -52,15 +52,17 @@ The controller is discovered by its `hp` hwmon name and `hp-wmi` platform path, 
 
 **Settings remain in firmware when the window closes.** To end a max fan burst, turn off Max fan speed before closing. Closing or reopening this app never changes hardware. Firmware or power management may reset settings at reboot or on other events.
 
-## Authentication
+## Background service and authentication
 
-The first setting change opens the system's polkit authentication dialog. After authentication, the app reuses a temporary privileged helper for the rest of that app session. Further profile changes and max/automatic fan toggles do not prompt again. **Lock Fan Controls** in the menu ends the session immediately; the next change asks again. Closing the window also ends it. If the helper crashes or the connection is lost, a new authorization may be needed.
+Cooling changes require the system service. Select **Enable Service** in the banner or **Background Service…** in the menu. Polkit authenticates the installation, which copies the bundled helper to `/usr/local/libexec/victus-fan-control/helper`, owned by root, and installs `/etc/systemd/system/victus-fan-control.service`. The persistent service never executes from your writable checkout or Flatpak deployment. Your password is handled by polkit, never by the app. Cancelling installation leaves hardware settings unchanged.
 
-The UI and RPM monitoring stay unprivileged. The compiled Go helper is bundled in the Flatpak and runs directly from its pinned host deployment path. It is statically linked with cgo disabled and has no host interpreter or dynamic C library dependency. The UI remains Python/GTK inside the Flatpak runtime. Session changes use a private stdin/stdout pipe. The helper accepts only four named thermal profiles and maximum/automatic fan modes. It discovers HP sysfs paths itself and never accepts paths, executable names, or code from protocol messages. It cannot create arbitrary files or follow a substituted sysfs attribute symlink. Both client and helper validate settings.
+The service starts at boot. Its `/run/victus-fan-control.sock` socket has mode `0600`, is owned by the account that enabled the service, and checks kernel peer credentials. Only that account and root may send commands. Enabling or updating from another account transfers access to that account. All processes running as the authorized user share this permission; it is not limited to this app. The daemon accepts only four named thermal profiles and maximum/automatic fan modes, discovers sysfs paths itself, and never accepts paths, executable names, or code in protocol messages.
 
-The helper exits on pipe closure; a 20-second heartbeat timeout bounds its lifetime after an unexpected disconnect. Flatpak also uses `flatpak-spawn --host --watch-bus`. No daemon, host-package installation, passwordless rule, permission change, or system-wide polkit policy is installed. The administrator prompt runs the bundled `victus-fan-control-helper --session`. Your password is handled by polkit, never the app. Cancelling authentication leaves cooling unchanged.
+The UI, RPM monitoring, and readback remain unprivileged. Closing the app closes its connection; the daemon stays active. **Disable Service** stops it and removes its unit and installed helper, without changing firmware settings. The previous Lock Fan Controls action and per-session authentication are no longer used.
 
-Firmware settings themselves remain active when the authorization session closes; locking does not change the selected cooling mode. The kernel and firmware retain their thermal protections.
+After updating the app, choose **Background Service… → Update Service** to replace the root-owned helper with the bundled version. This also migrates older service installations to the restricted socket and root-owned executable. Flatpak users must restart the app after enabling or updating the service so its sandbox sees the new socket. Connection, greeting, and reply failures are bounded by a timeout and reported in the UI.
+
+The compiled Go helper has cgo disabled and no host interpreter or dynamic C library dependency. Both client and helper validate settings; the helper cannot create missing sysfs attributes or follow a substituted attribute symlink. Firmware settings remain active after disconnecting or disabling the service. The kernel and firmware retain their thermal protections.
 
 ## Preview and checks
 
@@ -77,14 +79,17 @@ Firmware settings themselves remain active when the authorization session closes
 # Exercise the real GTK controls in preview mode, then exit
 /usr/bin/python3 -m fan_control --smoke-test
 
-# Exercise async writes, cancellation, and failures against temporary files
+# Exercise daemon writes, reconnects, and failures against temporary files
 /usr/bin/python3 tests/gui_integration.py
+/usr/bin/python3 tests/gui_host.py
 
 # Also save a screenshot of the preview window
 /usr/bin/python3 -m fan_control --smoke-test --screenshot /tmp/fan-control.png
 ```
 
 ## Uninstall
+
+First choose **Background Service… → Disable Service** to remove the host service and helper. Flatpak cannot remove these host files automatically. Then uninstall the app:
 
 ```sh
 flatpak uninstall --user io.github.sh7vansh.VictusFanControl
