@@ -38,6 +38,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.1" date="2026-10-17">
+      <description><p>Consolidate app metadata and host commands, simplify setting readback and packaging, and shorten documentation and comments.</p></description>
+    </release>
     <release version="1.5.0" date="2026-10-17">
       <description><p>Use an application ID matching the project repository and support migration from the previous Flatpak ID.</p></description>
     </release>
