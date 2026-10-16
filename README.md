@@ -18,6 +18,8 @@ flatpak run io.github.sh7vansh.VictusFanControl
 
 Select **Enable Service**, authenticate, and restart the app when prompted. Requires compatible HP firmware, `hp-wmi`, systemd, and polkit.
 
+On GNOME, the first launch assigns the **OMEN button** to open Fan Control if the key is unassigned. Change or disable it in Settings → Keyboard → Custom Shortcuts.
+
 ## Use
 
 - **Thermal profile:** choose Quiet, Cool, Balanced, or Performance where supported.

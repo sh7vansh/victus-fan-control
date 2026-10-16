@@ -23,7 +23,7 @@ def install(prefix):
     copy_file(helper, prefix / "libexec/victus-fan-control-helper", mode=0o755)
     copy_file(SOURCE / "data/licenses/Go-LICENSE", prefix / "share/licenses/victus-fan-control/Go-LICENSE")
     base = prefix / "share/victus-fan-control"
-    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py", "authorization.py", "native.py", "power_profiles.py", "service.py"):
+    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py", "authorization.py", "native.py", "power_profiles.py", "service.py", "shortcuts.py"):
         copy_file(SOURCE / "fan_control" / name, base / "fan_control" / name)
     shutil.copytree(SOURCE / "data/icons", base / "data/icons", dirs_exist_ok=True)
     copy_file(SOURCE / "data" / f"{APP_ID}.metainfo.xml", base / "data" / f"{APP_ID}.metainfo.xml")

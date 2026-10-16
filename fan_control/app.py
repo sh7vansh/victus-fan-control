@@ -23,6 +23,7 @@ from .power_profiles import (
 )
 from .native import FLATPAK_INFO
 from .service import install_service_async, is_service_active, uninstall_service_async
+from .shortcuts import setup_omen_shortcut
 
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
@@ -467,6 +468,8 @@ class FanApplication(Adw.Application):
 
     def do_startup(self):
         Adw.Application.do_startup(self)
+        if FLATPAK_INFO.exists() and not self.smoke_test and not isinstance(self.hardware, DemoHardware):
+            setup_omen_shortcut()
         provider = Gtk.CssProvider()
         provider.load_from_string(".rpm { font-size: 34px; font-weight: 700; font-feature-settings: 'tnum'; }")
         Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)

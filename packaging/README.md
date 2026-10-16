@@ -6,6 +6,8 @@ The host needs Flatpak, systemd, polkit (`pkexec`), coreutils, and a graphical a
 
 ## Permissions and service lifecycle
 
+On first normal launch on GNOME, the Flatpak uses host `gsettings` to assign the unmodified `Launch2` (OMEN) key to launch the app. It preserves existing assignments and subsequent edits or disabling of its shortcut. This user shortcut needs no administrator authentication and can be changed or removed in GNOME Settings → Keyboard → Custom Shortcuts. Demo, smoke-test, and source runs skip setup; other desktops are unchanged. Removing the Flatpak does not remove this desktop shortcut.
+
 `--talk-name=org.freedesktop.Flatpak` allows commands as the host user outside the sandbox. Host commands can access user files, so the sandbox is not a security boundary against this app. GNOME Software's “Potentially Unsafe” warning is accurate. Wayland, fallback X11, IPC, graphics rendering, desktop power-profile D-Bus access, and `/run/victus-fan-control.sock` access are also enabled.
 
 Enabling the service requires administrator authentication and records the enabling account's numeric UID. The daemon creates a mode `0600` socket owned by that account and checks `SO_PEERCRED` before sending the protocol greeting. Only that UID and root are accepted. The permission applies to all processes with that UID. Enabling or updating from a different account transfers access. The protocol permits only enumerated thermal profile and maximum/automatic fan operations; it accepts no client paths or executable commands.
