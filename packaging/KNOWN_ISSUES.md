@@ -48,3 +48,9 @@ The signed repository and `.flatpakref` are now the primary distribution. They s
 The separate `.flatpak` remains useful for offline transfer but can still show incomplete details in GNOME Software 50.4. Use the reference when viewing the complete installer listing.
 
 “Potentially Unsafe / Can acquire arbitrary permissions” remains correct: the selected host-command design permits commands outside the sandbox. Signing and metadata do not remove that permission. A narrower design would require a separately installed host service, which this package does not use.
+
+## Icon and screenshot refresh after installation
+
+A Software window which predates the first installation can retain a generic icon even though both installed AppStream icon files match the custom fan artwork. In the observed case, closing and reopening GNOME Software restored the fan icon; the user confirmed the corrected rendering. No icon asset replacement was needed.
+
+Version 1.0.3 replaces preview captures with live, read-only hardware screenshots. The listing checker now verifies cached icon content and exact source screenshot URLs. It reproduced a stale gallery by failing on the old preview URLs, then passes after refreshing only the Fan Control AppStream catalog and reopening Software. The installed application need not be updated to refresh the catalog.

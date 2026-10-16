@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("installer", type=Path, help="Published .flatpakref, or .flatpak for bundle diagnostics")
@@ -44,6 +45,10 @@ if args.installer.suffix == ".flatpakref":
     for name in required:
         if not field(name):
             raise SystemExit(f"FAIL: GNOME Software is missing {name}.")
+    metadata = ET.parse(source_icons.parent.parent / "io.github.sh7vansh.VictusFanControl.metainfo.xml").getroot()
+    for index, image in enumerate(metadata.findall("screenshots/screenshot/image")):
+        if image.text not in field(f"screenshot-{index:02d}"):
+            raise SystemExit("FAIL: GNOME Software still resolves an older screenshot URL. Refresh the app's repository catalog.")
     installed = field("state") == "installed"
     if not installed and "local-has-repository" not in field("quirk"):
         raise SystemExit("FAIL: GNOME Software does not recognize the update repository.")
