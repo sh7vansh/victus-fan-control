@@ -1,5 +1,5 @@
 [Flatpak Ref]
-Name=io.github.sh7vansh.VictusFanControl
+Name=io.github.sh7vansh.victus-fan-control
 Branch=stable
 IsRuntime=false
 SuggestRemoteName=victus-fan-control
