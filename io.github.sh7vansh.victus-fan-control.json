@@ -22,16 +22,9 @@
       ],
       "sources": [
         {
-          "type": "dir",
-          "path": ".",
-          "skip": [
-            ".git",
-            ".flatpak-builder",
-            "build",
-            "repo",
-            "dist",
-            "__pycache__"
-          ]
+          "type": "git",
+          "url": "https://github.com/sh7vansh/victus-fan-control.git",
+          "commit": "17febd8617b2b806798e5f03564b9ee24063b341"
         }
       ]
     }
