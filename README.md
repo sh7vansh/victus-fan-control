@@ -18,7 +18,7 @@ flatpak run io.github.sh7vansh.VictusFanControl
 
 The app uses `flatpak-spawn --host` and the host's `pkexec`; no separate RPM or service is required. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Fan changes still require administrator authentication. See [packaging details](packaging/README.md).
 
-Requires supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent on the host. The GNOME 51 runtime is supplied by Flathub. Screenshots show simulated preview data.
+Requires supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent on the host. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
 
 [Project page](https://sh7vansh.github.io/victus-fan-control/) · [Releases](https://github.com/sh7vansh/victus-fan-control/releases) · [Report a problem](https://github.com/sh7vansh/victus-fan-control/issues)
 

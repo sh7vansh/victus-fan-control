@@ -17,8 +17,8 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 </header>
 <p>Choose a firmware thermal profile, switch both fans to maximum speed, and check live fan RPM. The app follows your desktop’s light or dark appearance.</p>
 <div class="gallery">
-<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-light.png" width="520" height="900" alt="Fan Control preview in light appearance">
-<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-dark.png" width="520" height="900" alt="Fan Control preview in dark appearance">
+<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-light.png" width="520" height="820" alt="Fan Control in light appearance">
+<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/f0955f73e6ed33abc327394ce235b3228acb5c00/data/screenshots/fan-control-dark.png" width="520" height="820" alt="Fan Control in dark appearance">
 </div>
 <h2>Installation</h2>
 <p>Open the downloaded <code>.flatpakref</code> in your software center. It adds the signed Fan Control repository for future updates. You can also run:</p>
@@ -26,7 +26,7 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 <p>A separate RPM or service is not needed. Supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent are required on the host.</p>
 <h2>Host access and cooling</h2>
 <p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. Fan changes require administrator authentication through polkit. Your password is handled by the system.</p>
-<p>Maximum fan speed remains active after closing the app. Turn it off to restore automatic cooling. Available profiles and fan controls depend on the laptop’s firmware and Linux driver. Preview mode and the screenshots use simulated readings.</p>
+<p>Maximum fan speed remains active after closing the app. Turn it off to restore automatic cooling. Available profiles and fan controls depend on the laptop’s firmware and Linux driver. Screenshots show live readings from an HP Victus. Fan speeds vary with workload and temperature.</p>
 <footer>
 MIT license · By Shivansh Singh · <a href="https://github.com/sh7vansh/victus-fan-control/issues">Report a problem</a> · <a href="https://github.com/sh7vansh/victus-fan-control/releases">Releases</a> · <a href="fan-control.flatpakrepo">Repository</a> · <a href="signing-key.gpg">Signing public key</a>
 </footer>

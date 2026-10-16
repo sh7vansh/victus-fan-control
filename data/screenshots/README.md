@@ -1,13 +1,13 @@
 # Application screenshots
 
-These are captures of the real GTK/libadwaita window, using clearly labeled preview data:
+These are captures of the live GTK/libadwaita window on an HP Victus:
 
 * `fan-control-light.png`: light appearance, Balanced profile, and automatic cooling.
 * `fan-control-dark.png`: dark appearance of the same controls.
 
-Both images are 520 × 900 pixels. No screenshot is presented as a measurement from a particular laptop.
+Both images are 520 × 820 pixels. Fan RPM readings are real examples at capture time and vary with workload and temperature.
 
-Regenerate from the project root on a GNOME desktop:
+Regenerate from the project root on a GNOME desktop with supported hardware. The capture tool only reads sensors and never activates controls or changes settings:
 
 ```sh
 /usr/bin/python3 packaging/capture_screenshot.py light
