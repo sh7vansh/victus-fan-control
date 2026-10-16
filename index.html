@@ -4,28 +4,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="A GTK 4 and libadwaita app for cooling controls on HP Victus and OMEN laptops.">
 <title>Fan Control · HP Victus and OMEN</title>
-<link rel="icon" type="image/png" href="icon.png?v=1.0.3">
+<link rel="icon" type="image/png" href="icon.png?v=1.1.0">
 <style>
 :root{color-scheme:light dark;font-family:system-ui,sans-serif;background:light-dark(#fafafa,#1e1e1e);color:light-dark(#242424,#eee)}
 body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-width:640px}h1{font-size:2.5rem;letter-spacing:-.04em;margin-bottom:0}p{max-width:700px}a{color:light-dark(#1559a6,#99c1f1)}.install{display:inline-block;padding:12px 24px;border-radius:24px;background:#3584e4;color:white;text-decoration:none;font-weight:600;margin:12px 12px 12px 0}.version{display:inline-block;font-size:.85rem;font-weight:600;color:light-dark(#1559a6,#99c1f1);margin-top:12px}.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;max-width:720px;margin:40px 0}.gallery figure{margin:0}.gallery img{display:block;width:100%;height:auto;border-radius:12px}.gallery figcaption{margin-top:12px;font-size:.9rem;color:light-dark(#555,#bbb)}@media(max-width:560px){body{margin:32px auto}.gallery{grid-template-columns:1fr;max-width:380px}}code{overflow-wrap:anywhere}footer{border-top:1px solid #8885;padding-top:16px;margin-top:40px;font-size:.9rem}
 </style>
 <header>
-<img src="icon.png?v=1.0.3" width="96" height="96" alt="Fan Control icon">
+<img src="icon.png?v=1.1.0" width="96" height="96" alt="Fan Control icon">
 <h1>Fan Control</h1>
-<a class="version" href="https://github.com/sh7vansh/victus-fan-control/releases/tag/v1.0.3">Version 1.0.3 · Free and open source</a>
+<a class="version" href="https://github.com/sh7vansh/victus-fan-control/releases/tag/v1.1.0">Version 1.1.0 · Free and open source</a>
 <p>Manage cooling on HP Victus and OMEN laptops with a native GTK 4 and libadwaita app.</p>
 <a class="install" href="fan-control.flatpakref">Install with Flatpak</a>
 <a href="https://github.com/sh7vansh/victus-fan-control">Source code</a>
 </header>
 <p>Choose a firmware thermal profile, switch both fans to maximum speed, and check live fan RPM. The app follows your desktop’s light or dark appearance.</p>
-<p>Version 1.0.3 includes new screenshots captured directly from a running HP Victus.</p>
+<p>Version 1.1.0 lets you authenticate once per app session, then adjust cooling without repeated prompts. Use Lock Fan Controls in the menu to lock the session again.</p>
 <div class="gallery" aria-label="Application screenshots">
 <figure>
-<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/fcbdd7f9153bef2cbe373b9261116435f6336d8b/data/screenshots/fan-control-light.png" width="520" height="820" alt="Fan Control in light appearance, showing live fan RPM and firmware controls">
+<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/044b5d07fb1b4402df5c78f6710b73fa7d347042/data/screenshots/fan-control-light.png" width="520" height="820" alt="Fan Control in light appearance, showing live fan RPM and firmware controls">
 <figcaption>Light appearance · Live fan readings</figcaption>
 </figure>
 <figure>
-<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/fcbdd7f9153bef2cbe373b9261116435f6336d8b/data/screenshots/fan-control-dark.png" width="520" height="820" alt="Fan Control in dark appearance, showing live fan RPM and firmware controls">
+<img src="https://raw.githubusercontent.com/sh7vansh/victus-fan-control/044b5d07fb1b4402df5c78f6710b73fa7d347042/data/screenshots/fan-control-dark.png" width="520" height="820" alt="Fan Control in dark appearance, showing live fan RPM and firmware controls">
 <figcaption>Dark appearance · Live fan readings</figcaption>
 </figure>
 </div>
@@ -34,7 +34,7 @@ body{max-width:880px;margin:64px auto;padding:0 24px;line-height:1.6}header{max-
 <p><code>flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref</code></p>
 <p>A separate RPM or service is not needed. Supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent are required on the host.</p>
 <h2>Host access and cooling</h2>
-<p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. Fan changes require administrator authentication through polkit. Your password is handled by the system.</p>
+<p>The app has permission to run host commands as your user. Your software center accurately labels this as potentially unsafe. The first fan change requires administrator authentication through polkit. The temporary fan-control helper handles later changes in the same app session and exits when you close or lock it. Your password is handled by the system.</p>
 <p>Maximum fan speed remains active after closing the app. Turn it off to restore automatic cooling. Available profiles and fan controls depend on the laptop’s firmware and Linux driver. Screenshots show live readings from an HP Victus. Fan speeds vary with workload and temperature.</p>
 <footer>
 MIT license · By Shivansh Singh · <a href="https://github.com/sh7vansh/victus-fan-control/issues">Report a problem</a> · <a href="https://github.com/sh7vansh/victus-fan-control/releases">Releases</a> · <a href="fan-control.flatpakrepo">Repository</a> · <a href="signing-key.gpg">Signing public key</a>
