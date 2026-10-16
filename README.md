@@ -2,6 +2,8 @@
 
 Fan controls for HP Victus and OMEN laptops on Linux, built with GTK 4 and libadwaita.
 
+[Project page](https://sh7vansh.github.io/victus-fan-control/)
+
 <p>
   <img src="data/screenshots/fan-control-light.png" alt="Light appearance" width="280">
   <img src="data/screenshots/fan-control-dark.png" alt="Dark appearance" width="280">
