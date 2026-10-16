@@ -9,7 +9,7 @@ The `.flatpak` bundle contains `<project_license>MIT</project_license>`. LibAppS
 Reproduce through the actual consumer:
 
 ```sh
-/usr/bin/python3 packaging/check_software_page.py dist/io.github.sh7vansh.VictusFanControl-x86_64.flatpak
+/usr/bin/python3 packaging/check_software_page.py dist/io.github.sh7vansh.victus-fan-control-x86_64.flatpak
 ```
 
 Expected result on this affected version:

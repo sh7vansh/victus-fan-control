@@ -11,7 +11,8 @@ from .service import host_command_argv
 MEDIA_KEYS = "org.gnome.settings-daemon.plugins.media-keys"
 SHORTCUT_SCHEMA = MEDIA_KEYS + ".custom-keybinding"
 SHORTCUT_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/omen-fan-control/"
-COMMAND = "flatpak run io.github.sh7vansh.VictusFanControl"
+COMMAND = "flatpak run io.github.sh7vansh.victus-fan-control"
+LEGACY_COMMAND = "flatpak run io.github.sh7vansh.VictusFanControl"
 
 
 def gsettings(*args):
@@ -43,6 +44,8 @@ def ensure_omen_shortcut():
         # The name also records setup if the user later removes the shortcut
         # from the active list or clears its binding in GNOME Settings.
         if read_setting(schema, "name"):
+            if read_setting(schema, "command") == LEGACY_COMMAND:
+                write_setting(schema, "command", COMMAND)
             return
         paths = read_setting(MEDIA_KEYS, "custom-keybindings")
         for path in paths:

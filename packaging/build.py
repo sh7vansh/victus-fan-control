@@ -16,7 +16,10 @@ from install_files import install, SOURCE
 sys.path.insert(0, str(SOURCE))
 from fan_control import __version__
 
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
+LEGACY_APP_ID = "io.github.sh7vansh.VictusFanControl"
+# Keep the repository identity so existing installations can receive the rebase.
+COLLECTION_ID = LEGACY_APP_ID + ".Repository"
 
 
 def run(*args):
@@ -64,8 +67,15 @@ def flatpak(test=False, signing_key=None, gpg_homedir=None):
                 (SOURCE / "packaging/check_sandbox_session.py").read_text())
             run("flatpak", "build", *manifest["finish-args"], stage, "/app/bin/fan-control", "--check-host")
         repo = public / "repo" if signing_key else build / "development-repo"
-        collection = [f"--collection-id={APP_ID}.Repository"] if signing_key else []
+        collection = [f"--collection-id={COLLECTION_ID}"] if signing_key else []
         run("flatpak", "build-export", *collection, *signing, repo, stage, "stable")
+        if signing_key:
+            legacy_ref = f"app/{LEGACY_APP_ID}/{platform.machine()}/stable"
+            if (repo / "refs/heads" / legacy_ref).is_file():
+                run("flatpak", "build-commit-from", *signing, "--no-update-summary",
+                    f"--end-of-life-rebase={LEGACY_APP_ID}={APP_ID}",
+                    "--end-of-life=Fan Control has moved to its repository-matching application ID.",
+                    repo, legacy_ref)
         run("flatpak", "build-update-repo", *signing, "--title=Fan Control",
             "--default-branch=stable", "--homepage=https://sh7vansh.github.io/victus-fan-control/",
             "--generate-static-deltas", repo)

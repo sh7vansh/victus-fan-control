@@ -8,7 +8,7 @@ import shutil
 from appstream import compose
 from build_helper import build as build_helper
 
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
 SOURCE = Path(__file__).resolve().parent.parent
 
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>io.github.sh7vansh.VictusFanControl</id>
+  <id>io.github.sh7vansh.victus-fan-control</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <name>Fan Control</name>
@@ -30,7 +30,7 @@
       <image type="source" width="520" height="820">https://raw.githubusercontent.com/sh7vansh/victus-fan-control/044b5d07fb1b4402df5c78f6710b73fa7d347042/data/screenshots/fan-control-dark.png</image>
     </screenshot>
   </screenshots>
-  <launchable type="desktop-id">io.github.sh7vansh.VictusFanControl.desktop</launchable>
+  <launchable type="desktop-id">io.github.sh7vansh.victus-fan-control.desktop</launchable>
   <categories><category>Settings</category><category>HardwareSettings</category></categories>
   <keywords>
     <keyword>fan</keyword><keyword>cooling</keyword><keyword>thermal</keyword>
@@ -38,6 +38,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.0" date="2026-10-17">
+      <description><p>Use an application ID matching the project repository and support migration from the previous Flatpak ID.</p></description>
+    </release>
     <release version="1.4.2" date="2026-10-17">
       <description><p>Automatically set up the OMEN button to launch Fan Control on GNOME, while preserving existing shortcut assignments and user customizations.</p></description>
     </release>

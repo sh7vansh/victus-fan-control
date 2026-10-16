@@ -22,7 +22,7 @@ Open [fan-control.flatpakref](https://sh7vansh.github.io/victus-fan-control/fan-
 
 ```sh
 flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref
-flatpak run io.github.sh7vansh.VictusFanControl
+flatpak run io.github.sh7vansh.victus-fan-control
 flatpak update --user
 ```
 
@@ -38,11 +38,21 @@ With GNOME 51 Platform and a local Go 1.22+ compiler installed:
 
 This compiles the helper locally, then stages the Python UI and helper using the installed Platform. No SDK or flatpak-builder download is needed for this local route. Go builds use only the standard library with `GOPROXY=off` and `GOTOOLCHAIN=local`; no external Go modules or compiler downloads are used. It creates an unsigned development bundle under `dist/` and a development repository under `build/development-repo/`. The smoke test uses simulated readings; building does not install the app or alter fans. Omit `--test` without a graphical session.
 
-The conventional `io.github.sh7vansh.VictusFanControl.json` manifest also works with flatpak-builder, `org.gnome.Sdk//51`, and the matching `org.freedesktop.Sdk.Extension.golang` extension:
+The conventional `io.github.sh7vansh.victus-fan-control.json` manifest also works with flatpak-builder, `org.gnome.Sdk//51`, and the matching `org.freedesktop.Sdk.Extension.golang` extension:
 
 ```sh
-flatpak-builder --user --install-deps-from=flathub --repo=repo build/flatpak io.github.sh7vansh.VictusFanControl.json
+flatpak-builder --user --install-deps-from=flathub --repo=repo \
+  --compose-url-policy=full --mirror-screenshots-url=https://dl.flathub.org/media \
+  build/flatpak io.github.sh7vansh.victus-fan-control.json
 ```
+
+The manifest pins the source commit for reproducibility. The local `packaging/build.py` route builds the current checkout instead. The screenshot mirroring URL above is for a Flathub build candidate; its generated media must be deployed by Flathub before those URLs are usable by end users. The self-hosted release keeps its existing screenshot URLs.
+
+Run `/usr/bin/python3 packaging/check_flathub.py` to build a temporary candidate with mirrored screenshots and run the official linter in Podman. Results are saved under `build/flathub-lint/`. The command reports strict errors as well as the linter's permission-review mode; review warnings do not mean Flathub has approved a permission. No exceptions are suppressed, and this does not submit or publish the candidate.
+
+## Application ID migration
+
+Version 1.5.0 uses `io.github.sh7vansh.victus-fan-control`, matching the GitHub repository. Signed releases retain the existing repository collection ID, export the new app first, and mark the old `io.github.sh7vansh.VictusFanControl` ref for rebase to the new ID. Existing users receive the migration through Flatpak updates. The background service and its authorized UID remain unchanged; the new app updates its own old OMEN launcher command without restoring a disabled binding or replacing a customized command.
 
 ## Signed release
 
@@ -74,10 +84,10 @@ After the signed build, review and commit the generated changes in `build/public
 ```sh
 /usr/bin/python3 packaging/build_helper.py --test
 /usr/bin/python3 -m unittest discover -s tests -v
-appstreamcli validate --no-net data/io.github.sh7vansh.VictusFanControl.metainfo.xml
+appstreamcli validate --no-net data/io.github.sh7vansh.victus-fan-control.metainfo.xml
 /usr/bin/python3 tests/gui_integration.py
 /usr/bin/python3 tests/gui_host.py
-/usr/bin/python3 packaging/verify_bundle.py dist/io.github.sh7vansh.VictusFanControl-x86_64.flatpak
+/usr/bin/python3 packaging/verify_bundle.py dist/io.github.sh7vansh.victus-fan-control-x86_64.flatpak
 /usr/bin/python3 packaging/check_software_page.py dist/fan-control.flatpakref
 ```
 

@@ -8,7 +8,7 @@ gi.require_version("GdkPixbuf", "2.0")
 from gi.repository import GdkPixbuf
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
 icons = ROOT / "data/icons/hicolor"
 for size in (64, 128, 256, 512):
     target = icons / f"{size}x{size}/apps" / f"{APP_ID}.png"

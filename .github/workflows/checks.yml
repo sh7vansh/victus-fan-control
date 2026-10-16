@@ -15,8 +15,8 @@ jobs:
         run: /usr/bin/python3 -m unittest discover -s tests -v
       - name: Validate metadata
         run: |
-          appstreamcli validate --no-net data/io.github.sh7vansh.VictusFanControl.metainfo.xml
-          sed 's|@EXEC@|fan-control|g' data/io.github.sh7vansh.VictusFanControl.desktop.in > /tmp/io.github.sh7vansh.VictusFanControl.desktop
-          desktop-file-validate /tmp/io.github.sh7vansh.VictusFanControl.desktop
+          appstreamcli validate --no-net data/io.github.sh7vansh.victus-fan-control.metainfo.xml
+          sed 's|@EXEC@|fan-control|g' data/io.github.sh7vansh.victus-fan-control.desktop.in > /tmp/io.github.sh7vansh.victus-fan-control.desktop
+          desktop-file-validate /tmp/io.github.sh7vansh.victus-fan-control.desktop
       - name: Compile Python sources
         run: /usr/bin/python3 -m compileall -q fan_control packaging tests

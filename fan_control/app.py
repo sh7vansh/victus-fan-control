@@ -26,7 +26,7 @@ from .service import install_service_async, is_service_active, uninstall_service
 from .shortcuts import setup_omen_shortcut
 
 
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
 DATA = Path(__file__).resolve().parent.parent / "data"
 
 

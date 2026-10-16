@@ -11,7 +11,7 @@ import gi
 gi.require_version("Flatpak", "1.0")
 from gi.repository import Flatpak, Gio
 
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
 
 
 def verify(path):

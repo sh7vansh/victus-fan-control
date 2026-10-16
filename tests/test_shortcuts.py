@@ -42,6 +42,20 @@ class ShortcutTests(unittest.TestCase):
         shortcuts.ensure_omen_shortcut()
         self.assertEqual(self.settings, original)
 
+    def test_app_id_migration_updates_only_our_old_launcher_command(self):
+        shortcuts.ensure_omen_shortcut()
+        self.settings[(self.schema, "command")] = shortcuts.LEGACY_COMMAND
+        self.settings[(self.schema, "binding")] = ""
+        shortcuts.ensure_omen_shortcut()
+        self.assertEqual(self.settings[(self.schema, "command")], shortcuts.COMMAND)
+        self.assertEqual(self.settings[(self.schema, "binding")], "")
+
+    def test_app_id_migration_preserves_a_custom_launcher_command(self):
+        shortcuts.ensure_omen_shortcut()
+        self.settings[(self.schema, "command")] = "custom-launcher"
+        shortcuts.ensure_omen_shortcut()
+        self.assertEqual(self.settings[(self.schema, "command")], "custom-launcher")
+
     def test_existing_desktop_omen_assignment_is_preserved(self):
         original = self.settings.copy()
         with patch.object(shortcuts, "gsettings", return_value=shortcuts.MEDIA_KEYS + " calculator ['Launch2']"):

@@ -9,9 +9,26 @@ from datetime import datetime, timezone
 import gzip
 from pathlib import Path
 import shutil
+import subprocess
 import xml.etree.ElementTree as ET
 
-APP_ID = "io.github.sh7vansh.VictusFanControl"
+APP_ID = "io.github.sh7vansh.victus-fan-control"
+
+
+def compose_mirrored(prefix, base_url):
+    """Use AppStream's full composer for repositories that host their media."""
+    prefix = Path(prefix).resolve()
+    # The lightweight local catalog must not coexist with the mirrored one.
+    (prefix / "share/app-info/xmls" / f"{APP_ID}.xml.gz").unlink(missing_ok=True)
+    subprocess.run([
+        "appstreamcli", "compose", "--prefix=/", "--origin=flatpak",
+        f"--result-root={prefix}", f"--data-dir={prefix}/share/app-info/xmls",
+        f"--icons-dir={prefix}/share/app-info/icons/flatpak",
+        f"--media-dir={prefix}/share/app-info/media", f"--media-baseurl={base_url}",
+        "--no-partial-urls", str(prefix),
+    ], check=True)
+    (prefix / "share/app-info/xmls/flatpak.xml.gz").replace(
+        prefix / "share/app-info/xmls" / f"{APP_ID}.xml.gz")
 
 
 def compose(prefix):

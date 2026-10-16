@@ -13,7 +13,7 @@ Open the [Flatpak installer](https://sh7vansh.github.io/victus-fan-control/fan-c
 
 ```sh
 flatpak install --user https://sh7vansh.github.io/victus-fan-control/fan-control.flatpakref
-flatpak run io.github.sh7vansh.VictusFanControl
+flatpak run io.github.sh7vansh.victus-fan-control
 ```
 
 Select **Enable Service**, authenticate, and restart the app when prompted. Requires compatible HP firmware, `hp-wmi`, systemd, and polkit.
@@ -50,7 +50,7 @@ Use `--demo` for a preview without hardware access. See [packaging details](pack
 Choose **Background Service… → Disable Service** first, then run:
 
 ```sh
-flatpak uninstall --user io.github.sh7vansh.VictusFanControl
+flatpak uninstall --user io.github.sh7vansh.victus-fan-control
 ```
 
 [Report a problem](https://github.com/sh7vansh/victus-fan-control/issues) · [MIT license](LICENSE) · [Go runtime license](data/licenses/Go-LICENSE)

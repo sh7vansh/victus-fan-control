@@ -45,7 +45,7 @@ if args.installer.suffix == ".flatpakref":
     for name in required:
         if not field(name):
             raise SystemExit(f"FAIL: GNOME Software is missing {name}.")
-    metadata = ET.parse(source_icons.parent.parent / "io.github.sh7vansh.VictusFanControl.metainfo.xml").getroot()
+    metadata = ET.parse(source_icons.parent.parent / "io.github.sh7vansh.victus-fan-control.metainfo.xml").getroot()
     for index, image in enumerate(metadata.findall("screenshots/screenshot/image")):
         if image.text not in field(f"screenshot-{index:02d}"):
             raise SystemExit("FAIL: GNOME Software still resolves an older screenshot URL. Refresh the app's repository catalog.")
