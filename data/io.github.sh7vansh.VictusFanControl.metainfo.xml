@@ -38,6 +38,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.4.2" date="2026-10-17">
+      <description><p>Automatically set up the OMEN button to launch Fan Control on GNOME, while preserving existing shortcut assignments and user customizations.</p></description>
+    </release>
     <release version="1.4.1" date="2026-10-17">
       <description><p>Secure the background service with a root-owned helper and user-restricted socket. Repair service setup, bound connection waits, and add an Update Service action for existing installations.</p></description>
     </release>
