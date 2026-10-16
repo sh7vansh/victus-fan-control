@@ -49,6 +49,8 @@ if args.installer.suffix == ".flatpakref":
         raise SystemExit("FAIL: GNOME Software does not recognize the update repository.")
     if not installed and (not field("size-download") or field("size-download") == "unknown"):
         raise SystemExit("FAIL: GNOME Software has no remote download size.")
-    print("PASS: icon, description, both screenshots, homepage, MIT license, download size, and update repository recognized.")
+    print("PASS: icon, description, both screenshots, homepage, MIT license, and update repository recognized.")
+    if not installed:
+        print("PASS: remote download size recognized.")
 else:
     print("PASS: GNOME Software recognizes the MIT license.")
