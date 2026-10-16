@@ -1,10 +1,6 @@
-"""Compose this single app's catalog and icons for Flatpak bundle metadata.
+"""Compose the catalog and icons embedded in Flatpak bundles."""
 
-flatpak build-bundle reads share/app-info, not just share/metainfo. Keeping
-composition here makes the direct local build and SDK manifest behave alike.
-"""
-
-import copy
+import argparse
 from datetime import datetime, timezone
 import gzip
 from pathlib import Path
@@ -12,7 +8,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
-APP_ID = "io.github.sh7vansh.victus-fan-control"
+from project import APP_ID
 
 
 def compose_mirrored(prefix, base_url):
@@ -33,11 +29,10 @@ def compose_mirrored(prefix, base_url):
 
 def compose(prefix):
     prefix = Path(prefix)
-    component = copy.deepcopy(ET.parse(prefix / "share/metainfo" / f"{APP_ID}.metainfo.xml").getroot())
-    for tag in ("metadata_license",):
-        element = component.find(tag)
-        if element is not None:
-            component.remove(element)
+    component = ET.parse(prefix / "share/metainfo" / f"{APP_ID}.metainfo.xml").getroot()
+    license_element = component.find("metadata_license")
+    if license_element is not None:
+        component.remove(license_element)
     developer = component.findtext("developer/name")
     if developer:
         ET.SubElement(component, "developer_name").text = developer
@@ -60,3 +55,11 @@ def compose(prefix):
     target = prefix / "share/app-info/xmls" / f"{APP_ID}.xml.gz"
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(gzip.compress(xml, mtime=0))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("prefix", type=Path)
+    parser.add_argument("--media-baseurl", required=True)
+    args = parser.parse_args()
+    compose_mirrored(args.prefix, args.media_baseurl)

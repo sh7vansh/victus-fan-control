@@ -4,9 +4,10 @@ import os
 from pathlib import Path
 import shlex
 import subprocess
+
 from gi.repository import Gio
 
-from .native import FLATPAK_INFO, host_helper_path
+from .native import host_command_argv, host_helper_path
 
 DAEMON_SOCKET = Path("/run/victus-fan-control.sock")
 UNIT_PATH = Path("/etc/systemd/system/victus-fan-control.service")
@@ -45,18 +46,6 @@ def service_unit_content(helper_path: Path = INSTALLED_HELPER, allowed_uid: int 
         "[Install]\n"
         "WantedBy=multi-user.target\n"
     )
-
-
-def host_command_argv(*cmd, privileged=False):
-    argv = list(cmd)
-    if privileged:
-        argv = ["/usr/bin/pkexec", "--disable-internal-agent", *argv]
-    if FLATPAK_INFO.exists():
-        prefix = ["/usr/bin/flatpak-spawn", "--host"]
-        if privileged:
-            prefix.append("--watch-bus")
-        argv = [*prefix, *argv]
-    return argv
 
 
 def installation_script(helper: Path, allowed_uid: int, unit_path: Path = UNIT_PATH,

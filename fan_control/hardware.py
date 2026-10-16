@@ -44,7 +44,6 @@ class WriteRequest:
     value: str
 
 
-
 class Hardware:
     def __init__(self, root: Path = Path("/sys")):
         self.root = root

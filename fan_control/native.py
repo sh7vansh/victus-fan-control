@@ -1,4 +1,4 @@
-"""Locate the bundled static helper inside and outside Flatpak."""
+"""Host command arguments and bundled helper discovery."""
 
 from configparser import ConfigParser
 from pathlib import Path
@@ -19,7 +19,11 @@ def host_helper_path():
 
 
 def helper_argv(*args, privileged=False):
-    argv = [str(host_helper_path()), *args]
+    return host_command_argv(str(host_helper_path()), *args, privileged=privileged)
+
+
+def host_command_argv(*args, privileged=False):
+    argv = list(args)
     if privileged:
         argv = ["/usr/bin/pkexec", "--disable-internal-agent", *argv]
     if FLATPAK_INFO.exists():

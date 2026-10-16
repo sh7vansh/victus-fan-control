@@ -9,6 +9,8 @@ import re
 import subprocess
 import xml.etree.ElementTree as ET
 
+from project import APP_ID, SOURCE
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("installer", type=Path, help="Published .flatpakref, or .flatpak for bundle diagnostics")
 args = parser.parse_args()
@@ -34,7 +36,7 @@ for name in ("name", "version", "license", "origin", "size-download"):
 if field("license") != "MIT":
     raise SystemExit("FAIL: GNOME Software does not recognize the MIT license. Use the repository-backed .flatpakref.")
 # Check the actual cached image data, not merely the presence of an icon field.
-source_icons = Path(__file__).resolve().parent.parent / "data/icons/hicolor"
+source_icons = SOURCE / "data/icons/hicolor"
 expected_icons = {sha256(path.read_bytes()).digest() for path in source_icons.glob("*/apps/*.png")}
 icon_paths = [Path(value.strip()) for value in re.findall(r"^icon:\s*(/.+)$", app, re.MULTILINE)]
 if not any(path.is_file() and sha256(path.read_bytes()).digest() in expected_icons for path in icon_paths):
@@ -45,7 +47,7 @@ if args.installer.suffix == ".flatpakref":
     for name in required:
         if not field(name):
             raise SystemExit(f"FAIL: GNOME Software is missing {name}.")
-    metadata = ET.parse(source_icons.parent.parent / "io.github.sh7vansh.victus-fan-control.metainfo.xml").getroot()
+    metadata = ET.parse(SOURCE / "data" / f"{APP_ID}.metainfo.xml").getroot()
     for index, image in enumerate(metadata.findall("screenshots/screenshot/image")):
         if image.text not in field(f"screenshot-{index:02d}"):
             raise SystemExit("FAIL: GNOME Software still resolves an older screenshot URL. Refresh the app's repository catalog.")

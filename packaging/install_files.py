@@ -7,9 +7,7 @@ import shutil
 
 from appstream import compose
 from build_helper import build as build_helper
-
-APP_ID = "io.github.sh7vansh.victus-fan-control"
-SOURCE = Path(__file__).resolve().parent.parent
+from project import APP_ID, SOURCE
 
 
 def copy_file(source, destination, mode=0o644):

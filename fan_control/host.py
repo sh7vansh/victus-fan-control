@@ -12,7 +12,6 @@ from .native import helper_argv
 PROFILE_PATH = Path("/sys/firmware/acpi/platform_profile")
 
 
-
 def empty_snapshot():
     return Snapshot(None, (), None, None, (None, None), ("CPU fan", "GPU fan"))
 

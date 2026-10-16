@@ -11,7 +11,6 @@ from .service import DAEMON_SOCKET
 
 class ServiceUnavailable(ValueError):
     """Raised when the background system service is not reachable."""
-    pass
 
 
 class AuthorizationSession:
@@ -35,10 +34,6 @@ class AuthorizationSession:
         self.cancellable = None
         if self.socket_path and self.socket_path.exists():
             self.connect()
-
-    @property
-    def is_daemon(self):
-        return self.unlocked
 
     def change(self, request, finished):
         if self.pending:

@@ -11,7 +11,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-from . import __version__
+from . import APP_ID, __version__
 from .authorization import AuthorizationSession
 from .hardware import DemoHardware, Hardware, PROFILES
 from .host import HostHardware
@@ -21,22 +21,20 @@ from .power_profiles import (
     sync_to_desktop,
     unsubscribe_desktop_changes,
 )
-from .native import FLATPAK_INFO
+from .native import FLATPAK_INFO, host_command_argv
 from .service import install_service_async, is_service_active, uninstall_service_async
 from .shortcuts import setup_omen_shortcut
 
 
-APP_ID = "io.github.sh7vansh.victus-fan-control"
 DATA = Path(__file__).resolve().parent.parent / "data"
 
 
 def restart_app():
     if FLATPAK_INFO.exists():
-        cmd = ["/usr/bin/flatpak-spawn", "--host", "flatpak", "run", APP_ID]
-        Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
+        cmd = host_command_argv("flatpak", "run", APP_ID)
     else:
         cmd = [sys.executable, "-m", "fan_control"]
-        Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
+    Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE)
     app = Gio.Application.get_default()
     if app:
         app.quit()
@@ -391,22 +389,10 @@ class FanWindow(Adw.ApplicationWindow):
         self.update_authorization()
 
     def complete_write(self, request, message):
-        if isinstance(self.hardware, HostHardware):
-            def verified(error):
-                if error is not None:
-                    self.fail(str(error))
-                    return
-                self.busy = False
-                self.update_authorization()
-                self.spinner.set_spinning(False)
-                self.refresh()
-                self.toast_overlay.add_toast(Adw.Toast(title=message))
-                if is_live_hardware(self.hardware) and request.path.name == "platform_profile":
-                    sync_to_desktop(request.value)
-            self.hardware.verify_async(request, verified)
-            return GLib.SOURCE_REMOVE
-        try:
-            self.hardware.verify(request)
+        def verified(error=None):
+            if error is not None:
+                self.fail(str(error))
+                return
             self.busy = False
             self.update_authorization()
             self.spinner.set_spinning(False)
@@ -414,8 +400,16 @@ class FanWindow(Adw.ApplicationWindow):
             self.toast_overlay.add_toast(Adw.Toast(title=message))
             if is_live_hardware(self.hardware) and request.path.name == "platform_profile":
                 sync_to_desktop(request.value)
-        except ValueError as error:
-            self.fail(str(error))
+
+        if isinstance(self.hardware, HostHardware):
+            self.hardware.verify_async(request, verified)
+        else:
+            try:
+                self.hardware.verify(request)
+            except ValueError as error:
+                verified(error)
+            else:
+                verified()
         return GLib.SOURCE_REMOVE
 
     def _on_desktop_profile_change(self, _firmware_profile):
@@ -461,7 +455,7 @@ class FanApplication(Adw.Application):
         super().__init__(application_id=APP_ID + (".Preview" if demo else ""),
                          flags=Gio.ApplicationFlags.NON_UNIQUE if smoke_test else Gio.ApplicationFlags.DEFAULT_FLAGS)
         self.hardware = (DemoHardware() if demo else HostHardware()
-                         if Path("/.flatpak-info").exists() else Hardware())
+                         if FLATPAK_INFO.exists() else Hardware())
         self.smoke_test = smoke_test
         self.screenshot = screenshot
         self.failure = False
@@ -558,7 +552,7 @@ class FanApplication(Adw.Application):
             dialog.set_release_notes_version(release.get("version"))
         dialog.set_debug_info(f"Fan Control {__version__}\nGTK {Gtk.get_major_version()}.{Gtk.get_minor_version()}.{Gtk.get_micro_version()}\n"
                               f"libadwaita {Adw.get_major_version()}.{Adw.get_minor_version()}.{Adw.get_micro_version()}\n"
-                              f"Python {sys.version.split()[0]}\nPackaging: {'Flatpak' if Path('/.flatpak-info').exists() else 'Source checkout'}")
+                              f"Python {sys.version.split()[0]}\nPackaging: {'Flatpak' if FLATPAK_INFO.exists() else 'Source checkout'}")
         dialog.present(self.get_active_window())
 
 
@@ -570,7 +564,7 @@ def main():
     parser.add_argument("--screenshot", type=Path, help="Save a preview screenshot during --smoke-test")
     args = parser.parse_args()
     if args.check_host:
-        if not Path("/.flatpak-info").exists():
+        if not FLATPAK_INFO.exists():
             parser.error("--check-host must be run inside the Flatpak")
         hardware = HostHardware()
         loop = GLib.MainLoop()

@@ -8,16 +8,11 @@ import json
 from pathlib import Path
 import platform
 import subprocess
-import sys
 import tempfile
 
-from install_files import install, SOURCE
+from install_files import install
+from project import APP_ID, LEGACY_APP_ID, SOURCE, __version__
 
-sys.path.insert(0, str(SOURCE))
-from fan_control import __version__
-
-APP_ID = "io.github.sh7vansh.victus-fan-control"
-LEGACY_APP_ID = "io.github.sh7vansh.VictusFanControl"
 # Keep the repository identity so existing installations can receive the rebase.
 COLLECTION_ID = LEGACY_APP_ID + ".Repository"
 

@@ -8,7 +8,6 @@ from fan_control.hardware import DemoHardware, Hardware
 from fan_control.host import HostHardware
 from fan_control.power_profiles import (
     GNOME_POWER_PROFILES,
-    FIRMWARE_PROFILES,
     is_live_hardware,
     sync_to_desktop,
     subscribe_desktop_changes,
@@ -48,8 +47,8 @@ class PowerProfilesSyncTests(unittest.TestCase):
         mock_bus.call.assert_not_called()
 
     def test_sync_to_desktop_handles_missing_bus_or_dbus_errors(self):
-        # Should not raise
-        sync_to_desktop("balanced", bus=None)
+        with patch("fan_control.power_profiles.get_system_bus", return_value=None):
+            sync_to_desktop("balanced")
 
         failing_bus = MagicMock()
         failing_bus.call.side_effect = RuntimeError("D-Bus failure")

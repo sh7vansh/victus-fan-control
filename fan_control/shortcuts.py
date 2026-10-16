@@ -6,13 +6,14 @@ import threading
 
 from gi.repository import GLib
 
-from .service import host_command_argv
+from . import APP_ID, LEGACY_APP_ID
+from .native import host_command_argv
 
 MEDIA_KEYS = "org.gnome.settings-daemon.plugins.media-keys"
 SHORTCUT_SCHEMA = MEDIA_KEYS + ".custom-keybinding"
 SHORTCUT_PATH = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/omen-fan-control/"
-COMMAND = "flatpak run io.github.sh7vansh.victus-fan-control"
-LEGACY_COMMAND = "flatpak run io.github.sh7vansh.VictusFanControl"
+COMMAND = f"flatpak run {APP_ID}"
+LEGACY_COMMAND = f"flatpak run {LEGACY_APP_ID}"
 
 
 def gsettings(*args):

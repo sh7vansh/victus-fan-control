@@ -1,9 +1,5 @@
 #!/usr/bin/python3
-"""Build a local Flathub-style candidate and retain official linter results.
-
-Requires Podman, Flatpak, the GNOME runtime, and Go. Does not publish, install
-an app, or apply linter exceptions. Host execution still needs external review.
-"""
+"""Build a Flathub candidate and save linter results using Podman and Flatpak."""
 
 import argparse
 import json
@@ -12,7 +8,8 @@ import platform
 import subprocess
 import tempfile
 
-from install_files import APP_ID, SOURCE, install
+from install_files import install
+from project import APP_ID, SOURCE
 
 IMAGE = "ghcr.io/flathub/flatpak-builder-lint:latest"
 
@@ -32,15 +29,19 @@ def check(image=IMAGE):
                         *manifest["finish-args"], str(stage)], check=True)
         container = ["podman", "run", "--rm", "--security-opt=label=disable",
                      "-v", f"{SOURCE}:/src:ro", "-v", f"{work}:/work:rw", "-w", "/tmp"]
-        script = (
-            "import sys; from pathlib import Path; import subprocess; "
-            "sys.path.insert(0, '/src/packaging'); "
-            "from appstream import compose_mirrored; "
-            "compose_mirrored(Path('/work/app/files'), 'https://dl.flathub.org/media'); "
-            "subprocess.run(['flatpak', 'build-export', '/work/repo', '/work/app', 'stable'], check=True); "
-            f"subprocess.run(['ostree', '--repo=/work/repo', 'commit', '--canonical-permissions', '--branch=screenshots/{platform.machine()}', '/work/app/files/share/app-info/media'], check=True)"
-        )
-        subprocess.run([*container, "--entrypoint=python3", image, "-c", script], check=True)
+        subprocess.run([
+            *container, "--entrypoint=python3", image, "/src/packaging/appstream.py",
+            "/work/app/files", "--media-baseurl=https://dl.flathub.org/media",
+        ], check=True)
+        subprocess.run([
+            *container, "--entrypoint=flatpak", image,
+            "build-export", "/work/repo", "/work/app", "stable",
+        ], check=True)
+        subprocess.run([
+            *container, "--entrypoint=ostree", image,
+            "--repo=/work/repo", "commit", "--canonical-permissions",
+            f"--branch=screenshots/{platform.machine()}", "/work/app/files/share/app-info/media",
+        ], check=True)
         summary = {}
         checks = [
             ("appstream", [], "appstream", f"/src/data/{APP_ID}.metainfo.xml"),

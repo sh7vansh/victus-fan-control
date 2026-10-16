@@ -4,12 +4,11 @@
 import argparse
 import os
 import platform
-from pathlib import Path
 import struct
 import subprocess
-import sys
 
-SOURCE = Path(__file__).resolve().parent.parent
+from project import SOURCE, __version__
+
 OUTPUT = SOURCE / "build/native/victus-fan-control-helper"
 TEST_OUTPUT = SOURCE / "build/native/fan-control-helper-tests"
 
@@ -31,8 +30,6 @@ def assert_static(path):
 
 
 def build(test=False):
-    sys.path.insert(0, str(SOURCE))
-    from fan_control import __version__
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     arches = {"x86_64": "amd64", "aarch64": "arm64", "armv7l": "arm", "i686": "386", "riscv64": "riscv64", "ppc64le": "ppc64le"}

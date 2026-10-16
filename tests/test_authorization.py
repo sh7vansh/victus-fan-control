@@ -78,7 +78,6 @@ class AuthorizationTests(unittest.TestCase):
         self.addCleanup(session.close)
         self.spin(100)
         self.assertTrue(session.unlocked)
-        self.assertTrue(session.is_daemon)
 
         self.assertIsNone(self.change_with_session(session, "quiet"))
         self.assertIsNone(self.change_with_session(session, "0", "pwm1_enable"))
