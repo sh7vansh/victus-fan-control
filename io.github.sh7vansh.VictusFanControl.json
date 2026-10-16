@@ -15,14 +15,35 @@
     {
       "name": "victus-fan-control",
       "buildsystem": "simple",
-      "build-commands": ["python3 packaging/install_files.py --prefix=/app"],
+      "build-commands": [
+        "python3 packaging/install_files.py --prefix=/app"
+      ],
       "sources": [
         {
           "type": "dir",
           "path": ".",
-          "skip": [".git", ".flatpak-builder", "build", "repo", "dist", "__pycache__"]
+          "skip": [
+            ".git",
+            ".flatpak-builder",
+            "build",
+            "repo",
+            "dist",
+            "__pycache__"
+          ]
         }
       ]
     }
-  ]
+  ],
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.golang"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/golang/bin",
+    "env": {
+      "CGO_ENABLED": "0",
+      "GOTOOLCHAIN": "local",
+      "GOPROXY": "off",
+      "GOROOT": "/usr/lib/sdk/golang"
+    }
+  }
 }

@@ -60,3 +60,9 @@ Version 1.0.3 replaces preview captures with live, read-only hardware screenshot
 The previous per-write `pkexec tee` flow is replaced by an app-session helper. The first change authenticates; later changes use a private, enumerated protocol. Lock Fan Controls or window close ends the session. The helper is not installed as a system service. A missing heartbeat expires an idle helper within 20 seconds; a crash or disconnected helper requires a new authorization on the next attempt.
 
 Real polkit startup and EOF shutdown were tested on the Fedora target using only heartbeat messages and one authentication. Hardware writes in the new protocol were tested against temporary sysfs; the automated suite does not claim real authenticated firmware writes on every laptop. See packaging/README.md for the current design; older per-write examples in the original distribution research describe the earlier release.
+
+## Compiled host helper in 1.2.0
+
+Discovery, readback, and session changes now use the bundled statically linked Go helper. The Python privileged helper and host Python/cat commands are removed. Earlier Python dependency and interpreter command examples in historical release notes/research describe releases through 1.1.0. Current Flatpak users need polkit and the relevant kernel/firmware interfaces on the host; GTK/Python run inside the Flatpak runtime.
+
+The helper executes from the host deployment path recorded by Flatpak, with no separate RPM or service. Its architecture follows the Flatpak architecture and it has no dynamic loader dependency. Go fixture-only flags are compiled exclusively into a separate test executable which is never packaged.

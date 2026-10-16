@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from fan_control.app import FanApplication, FanWindow
 from fan_control.host import HostHardware, PROFILE_PATH
 from gi.repository import Gio, GLib
-from session_fixture import fixture_session
+from session_fixture import fixture_session, fixture_argv
 import test_hardware
 
 
@@ -26,15 +26,12 @@ class FixtureHostHardware(HostHardware):
         raise AssertionError(f"Unexpected write/readback path: {host_path}")
 
     def read_command(self, argv, finished, timeout_ms=3000):
-        assert argv[:2] == ["/usr/bin/flatpak-spawn", "--host"]
-        if argv[2] == "/usr/bin/python3":
-            script = "import sys\n" + argv[-1].replace("Hardware().read()", "Hardware(Path(sys.argv[1])).read()")
-            script = script.replace("str(state['controller']) if state['controller'] else None",
-                                    "'/sys/devices/platform/hp-wmi/hwmon/hwmon42' if state['controller'] else None")
-            command = [sys.executable, "-I", "-c", script, str(self.fixture.root)]
+        if argv[-1] == "--snapshot":
+            command = fixture_argv(self.fixture.root, mode="snapshot")
         else:
-            assert argv[2:4] == ["/usr/bin/cat", "--"]
-            command = ["/usr/bin/cat", "--", str(self.local_path(argv[-1]))]
+            operation, value = argv[-2:]
+            assert operation in ("--verify-profile", "--verify-fan")
+            command = fixture_argv(self.fixture.root, mode=operation[2:], value=value)
         HostHardware.read_command(command, finished, timeout_ms)
 
 

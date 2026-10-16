@@ -7,8 +7,9 @@ from unittest.mock import patch
 
 from gi.repository import GLib
 
-from fan_control.host import HostHardware, READ_SCRIPT, parse_snapshot
+from fan_control.host import HostHardware, parse_snapshot
 import test_hardware
+from session_fixture import fixture_argv
 
 
 def sample():
@@ -37,12 +38,11 @@ class HostTests(unittest.TestCase):
         self.assertEqual(len(result), 1)
         return result[0]
 
-    def test_host_reads_need_no_installed_python_app_or_import_path(self):
+    def test_host_reads_use_the_compiled_helper(self):
         fixture = test_hardware.HardwareTests()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
-        script = "import sys\n" + READ_SCRIPT.replace("Hardware().read()", "Hardware(Path(sys.argv[1])).read()")
-        result = subprocess.run([sys.executable, "-I", "-c", script, str(fixture.root)],
+        result = subprocess.run(fixture_argv(fixture.root, mode="snapshot"),
                                 check=True, capture_output=True, text=True)
         state = json.loads(result.stdout)
         self.assertEqual(state["profile"], "balanced")
@@ -105,20 +105,19 @@ class HostTests(unittest.TestCase):
         self.assertIsNone(self.host.error)
         self.assertEqual(len(completed), 2)
 
-    def test_readback_uses_the_host_and_detects_external_changes(self):
+    def test_readback_uses_the_compiled_helpers_fixed_operations(self):
         request = self.host.profile_request("quiet")
         outcomes = []
         argv_seen = []
-
         def command(argv, done):
             argv_seen.append(argv)
-            done("balanced\n", None)
-
+            done("", ValueError("The setting did not stay applied."))
         with patch.object(HostHardware, "read_command", side_effect=command):
             self.host.verify_async(request, outcomes.append)
         self.assertIn("did not stay applied", str(outcomes[0]))
-        self.assertEqual(argv_seen[0], ["/usr/bin/flatpak-spawn", "--host", "/usr/bin/cat", "--", str(request.path)])
-        with patch.object(HostHardware, "read_command", side_effect=lambda argv, done: done("quiet\n", None)):
+        self.assertEqual(argv_seen[0][-2:], ["--verify-profile", "quiet"])
+        self.assertNotIn("/usr/bin/cat", argv_seen[0])
+        with patch.object(HostHardware, "read_command", side_effect=lambda argv, done: done("", None)):
             self.host.verify_async(request, outcomes.append)
         self.assertIsNone(outcomes[1])
 

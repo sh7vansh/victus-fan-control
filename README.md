@@ -18,7 +18,7 @@ flatpak run io.github.sh7vansh.VictusFanControl
 
 The app uses `flatpak-spawn --host` and the host's `pkexec`; no separate RPM or service is required. **This permits commands outside the sandbox as your user**, which GNOME Software labels “Potentially Unsafe.” Fan changes require administrator authentication once per app session. See [packaging details](packaging/README.md).
 
-Requires supported HP firmware, Python 3.10+, polkit, coreutils, and a graphical authentication agent on the host. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
+Requires supported HP firmware, Flatpak, polkit (`pkexec`), and a graphical authentication agent on the host. A static Go helper is bundled; host Python, Go, and coreutils are not required by the app. The GNOME 51 runtime is supplied by Flathub. Screenshots show live readings from an HP Victus; fan speeds and available controls vary by laptop.
 
 [Project page](https://sh7vansh.github.io/victus-fan-control/) · [Releases](https://github.com/sh7vansh/victus-fan-control/releases) · [Report a problem](https://github.com/sh7vansh/victus-fan-control/issues)
 
@@ -32,9 +32,10 @@ On Fedora, use the system Python. Dependencies: `python3-gobject`, `gtk4`, `liba
 sudo dnf install python3-gobject gtk4 libadwaita polkit
 ```
 
-From this directory:
+For source development, also install Go 1.22+ and build the helper. Flatpak users do not need the compiler. From this directory:
 
 ```sh
+/usr/bin/python3 packaging/build_helper.py --test
 /usr/bin/python3 -m fan_control
 ```
 
@@ -55,9 +56,9 @@ The controller is discovered by its `hp` hwmon name and `hp-wmi` platform path, 
 
 The first setting change opens the system's polkit authentication dialog. After authentication, the app reuses a temporary privileged helper for the rest of that app session. Further profile changes and max/automatic fan toggles do not prompt again. **Lock Fan Controls** in the menu ends the session immediately; the next change asks again. Closing the window also ends it. If the helper crashes or the connection is lost, a new authorization may be needed.
 
-The UI and RPM monitoring stay unprivileged. The host's Python runs the app's small helper in isolated mode (`-I`), with a private stdin/stdout pipe. The helper accepts only four named thermal profiles and maximum/automatic fan modes. It discovers HP sysfs paths itself and never accepts paths, executable names, or code from protocol messages. It cannot create arbitrary files or follow a substituted sysfs attribute symlink. Both client and helper validate settings.
+The UI and RPM monitoring stay unprivileged. The compiled Go helper is bundled in the Flatpak and runs directly from its pinned host deployment path. It is statically linked with cgo disabled and has no host interpreter or dynamic C library dependency. The UI remains Python/GTK inside the Flatpak runtime. Session changes use a private stdin/stdout pipe. The helper accepts only four named thermal profiles and maximum/automatic fan modes. It discovers HP sysfs paths itself and never accepts paths, executable names, or code from protocol messages. It cannot create arbitrary files or follow a substituted sysfs attribute symlink. Both client and helper validate settings.
 
-The helper exits on pipe closure; a 20-second heartbeat timeout bounds its lifetime after an unexpected disconnect. Flatpak also uses `flatpak-spawn --host --watch-bus`. No daemon, host-package installation, passwordless rule, permission change, or system-wide polkit policy is installed. The administrator prompt may describe running Python: that interpreter runs the app's fixed fan helper. Your password is handled by polkit, never the app. Cancelling authentication leaves cooling unchanged.
+The helper exits on pipe closure; a 20-second heartbeat timeout bounds its lifetime after an unexpected disconnect. Flatpak also uses `flatpak-spawn --host --watch-bus`. No daemon, host-package installation, passwordless rule, permission change, or system-wide polkit policy is installed. The administrator prompt runs the bundled `victus-fan-control-helper --session`. Your password is handled by polkit, never the app. Cancelling authentication leaves cooling unchanged.
 
 Firmware settings themselves remain active when the authorization session closes; locking does not change the selected cooling mode. The kernel and firmware retain their thermal protections.
 
@@ -66,6 +67,9 @@ Firmware settings themselves remain active when the authorization session closes
 ```sh
 # Interactive preview with in-memory data; never accesses hardware
 /usr/bin/python3 -m fan_control --demo
+
+# Build/test the compiled helper and its separate test fixture executable
+/usr/bin/python3 packaging/build_helper.py --test
 
 # Hardware discovery, validation, and readback tests using a temporary sysfs tree
 /usr/bin/python3 -m unittest discover -s tests -v
@@ -92,6 +96,7 @@ Removing the app does not change the current firmware settings. The source check
 
 * [Linux platform profile interface](https://docs.kernel.org/userspace-api/sysfs-platform_profile.html)
 * [HP WMI driver](https://github.com/torvalds/linux/blob/master/drivers/platform/x86/hp/hp-wmi.c), including `PWM_MODE_MAX = 0`, `PWM_MODE_AUTO = 2`, CPU fan 0, GPU fan 1.
+* [Flatpak deployment paths](https://docs.flatpak.org/en/latest/flatpak-command-reference.html#flatpak-metadata), using the runtime-provided `Instance/app-path`.
 * [libadwaita widgets](https://gnome.pages.gitlab.gnome.org/libadwaita/doc/main/)
 
-[MIT license](LICENSE).
+[MIT license](LICENSE). The bundled Go runtime uses the [Go BSD license](data/licenses/Go-LICENSE).

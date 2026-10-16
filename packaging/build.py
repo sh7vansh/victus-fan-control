@@ -24,10 +24,9 @@ def run(*args):
 
 
 def flatpak(test=False, signing_key=None, gpg_homedir=None):
-    """Stage pure Python files; no compiler or SDK download is needed locally.
+    """Build the static helper locally, then stage the app using the Platform.
 
-    The checked-in flatpak-builder manifest is the standard SDK build path for
-    CI/Flathub. This local path uses the installed Platform as the build root.
+    The flatpak-builder manifest instead uses the GNOME SDK and Go extension.
     """
     manifest = json.loads((SOURCE / f"{APP_ID}.json").read_text())
     build = SOURCE / "build"
@@ -63,6 +62,7 @@ def flatpak(test=False, signing_key=None, gpg_homedir=None):
             run("flatpak", "build", *manifest["finish-args"], stage, "/app/bin/fan-control", "--smoke-test")
             run("flatpak", "build", *manifest["finish-args"], stage, "python3", "-c",
                 (SOURCE / "packaging/check_sandbox_session.py").read_text())
+            run("flatpak", "build", *manifest["finish-args"], stage, "/app/bin/fan-control", "--check-host")
         repo = public / "repo" if signing_key else build / "development-repo"
         collection = [f"--collection-id={APP_ID}.Repository"] if signing_key else []
         run("flatpak", "build-export", *collection, *signing, repo, stage, "stable")

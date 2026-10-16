@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 
 from appstream import compose
+from build_helper import build as build_helper
 
 APP_ID = "io.github.sh7vansh.VictusFanControl"
 SOURCE = Path(__file__).resolve().parent.parent
@@ -18,8 +19,11 @@ def copy_file(source, destination, mode=0o644):
 
 
 def install(prefix):
+    helper = build_helper()
+    copy_file(helper, prefix / "libexec/victus-fan-control-helper", mode=0o755)
+    copy_file(SOURCE / "data/licenses/Go-LICENSE", prefix / "share/licenses/victus-fan-control/Go-LICENSE")
     base = prefix / "share/victus-fan-control"
-    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py", "authorization.py", "privileged.py"):
+    for name in ("__init__.py", "__main__.py", "app.py", "hardware.py", "host.py", "authorization.py", "native.py"):
         copy_file(SOURCE / "fan_control" / name, base / "fan_control" / name)
     shutil.copytree(SOURCE / "data/icons", base / "data/icons", dirs_exist_ok=True)
     copy_file(SOURCE / "data" / f"{APP_ID}.metainfo.xml", base / "data" / f"{APP_ID}.metainfo.xml")

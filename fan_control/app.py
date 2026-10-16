@@ -333,7 +333,7 @@ class FanWindow(Adw.ApplicationWindow):
     def show_host_error(self, _banner):
         detail = self.hardware.error or "Host access is still connecting."
         dialog = Adw.AlertDialog(heading="Host access unavailable",
-                                 body="Allow this app to run host commands in Flatpak permissions. The host also needs Python 3.10 or newer, polkit, and coreutils.\n\n" + detail)
+                                 body="Allow this app to run host commands in Flatpak permissions. The host also needs polkit and a graphical authentication agent.\n\n" + detail)
         dialog.add_response("close", "Close")
         dialog.set_default_response("close")
         dialog.present(self)

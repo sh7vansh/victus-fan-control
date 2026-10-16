@@ -1,55 +1,19 @@
-"""Exercise the real Flatpak host pipe without authentication or hardware writes."""
+"""Exercise the real bundled helper via the Flatpak host pipe, without writes."""
 
-from pathlib import Path
+import json
+import subprocess
 import sys
 sys.path.insert(0, '/app/share/victus-fan-control')
+from fan_control.native import helper_argv
 
-from gi.repository import GLib
-from fan_control.authorization import AuthorizationSession
-from fan_control.hardware import WriteRequest
-
-peer = '''
-import json, sys
-print('{"ready":true}', flush=True)
-for line in sys.stdin:
-    request = json.loads(line)
-    if request.get('operation') == 'ping':
-        continue
-    print(json.dumps({'id':request['id'], 'ok':True}), flush=True)
-'''
-launches = []
-def argv():
-    launches.append(True)
-    return ['/usr/bin/flatpak-spawn', '--host', '--watch-bus', '/usr/bin/python3', '-I', '-u', '-c', peer]
-
-loop = GLib.MainLoop()
-session = AuthorizationSession(argv_factory=argv)
-requests = iter((WriteRequest(Path('/sys/firmware/acpi/platform_profile'), 'quiet'),
-                 WriteRequest(Path('/sys/devices/platform/hp-wmi/hwmon/hwmon1/pwm1_enable'), '0'),
-                 WriteRequest(Path('/sys/devices/platform/hp-wmi/hwmon/hwmon1/pwm1_enable'), '2')))
-failures = []
-def exited(process, result):
-    process.wait_finish(result)
-    if not process.get_successful():
-        failures.append('Host pipe did not close cleanly')
-    loop.quit()
-
-def advance(error=None):
-    if error:
-        failures.append(str(error))
-        session.close()
-        loop.quit()
-        return
-    request = next(requests, None)
-    if request:
-        session.change(request, advance)
-    else:
-        assert len(launches) == 1
-        process = session.process
-        process.wait_async(None, exited)
-        session.close()
-
-advance()
-loop.run()
-assert not failures, failures
-print('Sandbox session passed: three requests, one host process, clean pipe shutdown, no authentication or hardware writes')
+snapshot_argv = helper_argv('--snapshot')
+assert '/usr/bin/python3' not in snapshot_argv
+assert '/usr/bin/cat' not in snapshot_argv
+state = json.loads(subprocess.check_output(snapshot_argv, text=True))
+assert isinstance(state['choices'], list)
+assert len(state['rpm']) == 2
+assert helper_argv('--session', privileged=True)[-1] == '--session'
+# Entry point must reject writes without pkexec; this check never authenticates.
+result = subprocess.run(helper_argv('--session'), input='', capture_output=True, text=True)
+assert result.returncode != 0 and 'Administrator authentication' in result.stderr
+print('Sandbox compiled-helper check passed: real host snapshot, no host interpreter, unprivileged writes rejected')

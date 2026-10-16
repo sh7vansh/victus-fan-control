@@ -1,11 +1,11 @@
 """One polkit authorization for a window's private, fan-only command pipe."""
 
 import json
-from pathlib import Path
 
 from gi.repository import Gio, GLib
 
 from .hardware import PROFILES
+from .native import helper_argv
 
 
 class AuthenticationCancelled(ValueError):
@@ -13,11 +13,7 @@ class AuthenticationCancelled(ValueError):
 
 
 def session_argv():
-    source = Path(__file__).with_name("privileged.py").read_text()
-    argv = ["/usr/bin/pkexec", "--disable-internal-agent", "/usr/bin/python3", "-I", "-u", "-c", source]
-    if Path("/.flatpak-info").exists():
-        argv = ["/usr/bin/flatpak-spawn", "--host", "--watch-bus", *argv]
-    return argv
+    return helper_argv("--session", privileged=True)
 
 
 class AuthorizationSession:
@@ -154,7 +150,7 @@ class AuthorizationSession:
             return
         cancelled = not self.unlocked and process.get_if_exited() and process.get_exit_status() == 126
         error = (AuthenticationCancelled("Authentication cancelled") if cancelled else
-                 ValueError("The fan-control session ended. Try again to authenticate. Check that polkit and Python are installed."))
+                 ValueError("The fan-control session ended. Try again to authenticate. Check that polkit and the bundled helper are available."))
         self._fail(error)
 
     def _timed_out(self):

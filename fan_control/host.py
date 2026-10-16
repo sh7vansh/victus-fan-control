@@ -6,21 +6,11 @@ from pathlib import Path
 from gi.repository import Gio, GLib
 
 from .hardware import PROFILES, Snapshot, WriteRequest
+from .native import helper_argv
 
 
-SPAWN = ["/usr/bin/flatpak-spawn", "--host"]
 PROFILE_PATH = Path("/sys/firmware/acpi/platform_profile")
 
-# Run a copy of our read-only discovery logic as the normal host user. Passing
-# the code directly needs no host installation and no access to the checkout.
-# Privileged changes use the separate session helper; this code stays unprivileged.
-READ_SCRIPT = Path(__file__).with_name("hardware.py").read_text() + """
-import json
-from dataclasses import asdict
-state = asdict(Hardware().read())
-state['controller'] = str(state['controller']) if state['controller'] else None
-print(json.dumps(state))
-"""
 
 
 def empty_snapshot():
@@ -78,7 +68,10 @@ class HostHardware:
                 self.pending = False
             updated()
 
-        self.read_command([*SPAWN, "/usr/bin/python3", "-I", "-c", READ_SCRIPT], finished)
+        try:
+            self.read_command(helper_argv("--snapshot"), finished)
+        except (OSError, ValueError) as error:
+            finished("", error)
 
     def profile_request(self, value):
         if not self.available or self.snapshot.profile is None:
@@ -93,12 +86,11 @@ class HostHardware:
         return WriteRequest(self.snapshot.controller / "pwm1_enable", "0" if maximum else "2")
 
     def verify_async(self, request, finished):
-        def readback(output, error):
-            if error is None and output.strip() != request.value:
-                error = ValueError("The setting did not stay applied. The firmware or another power management app may have changed it.")
+        operation = "--verify-profile" if request.path.name == "platform_profile" else "--verify-fan"
+        try:
+            self.read_command(helper_argv(operation, request.value), lambda _output, error: finished(error))
+        except (OSError, ValueError) as error:
             finished(error)
-
-        self.read_command([*SPAWN, "/usr/bin/cat", "--", str(request.path)], readback)
 
     @staticmethod
     def read_command(argv, finished, timeout_ms=3000):

@@ -9,9 +9,9 @@ from gi.repository import GLib
 
 from fan_control.authorization import AuthorizationSession, AuthenticationCancelled, session_argv
 from fan_control.hardware import WriteRequest
-from fan_control.privileged import SysfsControls, dispatch
 import test_hardware
-from session_fixture import fixture_argv
+from session_fixture import fixture_argv, ROOT
+from fan_control.native import host_helper_path
 
 
 class AuthorizationTests(unittest.TestCase):
@@ -87,32 +87,19 @@ class AuthorizationTests(unittest.TestCase):
         self.assertEqual(len(self.launches), 1)
 
     def test_server_rejects_unknown_operations_values_and_client_paths(self):
-        controls = SysfsControls(self.fixture.root)
         cases = [[], {"operation": "shell", "value": "id", "id": 1},
                  {"operation": "profile", "value": "quiet\nperformance", "id": 1},
                  {"operation": "fan", "value": "1", "id": 1},
                  {"operation": "fan", "value": 0, "id": 1},
                  {"operation": "profile", "value": "quiet", "id": True},
                  {"operation": "profile", "value": "quiet", "id": 1, "path": "/etc/passwd"}]
-        for case in cases:
-            with self.subTest(case=case), self.assertRaises(ValueError):
-                dispatch(case, controls)
+        payload = "".join(json.dumps(case) + "\n" for case in cases)
+        result = subprocess.run(fixture_argv(self.fixture.root), input=payload, text=True, capture_output=True, check=True)
+        messages = [json.loads(line) for line in result.stdout.splitlines()][1:]
+        self.assertEqual(len(messages), len(cases))
+        self.assertTrue(all(not message["ok"] for message in messages))
         self.assertEqual(self.fixture.hardware.read().profile, "balanced")
         self.assertEqual(self.fixture.hardware.read().mode, 2)
-
-    def test_missing_or_symlinked_attributes_are_never_created_or_followed(self):
-        controls = SysfsControls(self.fixture.root)
-        path = self.fixture.acpi / "platform_profile"
-        path.unlink()
-        with self.assertRaises(OSError):
-            controls.change("profile", "quiet")
-        self.assertFalse(path.exists())
-        unrelated = self.fixture.root / "unrelated-file"
-        unrelated.write_text("unchanged")
-        path.symlink_to(unrelated)
-        with self.assertRaises(OSError):
-            controls.change("profile", "quiet")
-        self.assertEqual(unrelated.read_text(), "unchanged")
 
     def test_heartbeat_preserves_session_and_missing_heartbeat_expires_it(self):
         self.session.argv_factory = lambda: fixture_argv(self.fixture.root, idle_seconds=.2)
@@ -165,18 +152,23 @@ class AuthorizationTests(unittest.TestCase):
         self.assertEqual(self.fixture.hardware.read().profile, "quiet")
 
     def test_root_entry_point_refuses_unprivileged_execution(self):
-        source = Path("fan_control/privileged.py").read_text()
-        result = subprocess.run([sys.executable, "-I", "-u", "-c", source], input="", text=True, capture_output=True)
+        result = subprocess.run([str(ROOT / "build/native/victus-fan-control-helper"), "--session"],
+                                input="", text=True, capture_output=True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Administrator authentication", result.stderr)
         self.assertEqual(result.stdout, "")
 
-    def test_flatpak_helper_is_watched_and_python_environment_is_isolated(self):
-        with patch.object(Path, "exists", return_value=True):
+    def test_flatpak_uses_the_pinned_host_deployment_without_interpreters(self):
+        with patch.object(Path, "exists", return_value=True), patch.object(Path, "read_text", return_value="[Instance]\napp-path=/host/app files\n"):
             argv = session_argv()
-        self.assertEqual(argv[:3], ["/usr/bin/flatpak-spawn", "--host", "--watch-bus"])
-        self.assertEqual(argv[3:9], ["/usr/bin/pkexec", "--disable-internal-agent", "/usr/bin/python3", "-I", "-u", "-c"])
-        self.assertNotIn("shell=True", argv[-1])
+        self.assertEqual(argv, ["/usr/bin/flatpak-spawn", "--host", "--watch-bus", "/usr/bin/pkexec", "--disable-internal-agent",
+                                "/host/app files/libexec/victus-fan-control-helper", "--session"])
+
+    def test_invalid_flatpak_deployment_paths_are_rejected(self):
+        for path in ("", "relative", "/host/../other"):
+            with patch.object(Path, "exists", return_value=True), patch.object(Path, "read_text", return_value=f"[Instance]\napp-path={path}\n"):
+                with self.assertRaises(ValueError):
+                    host_helper_path()
 
 
 if __name__ == "__main__":

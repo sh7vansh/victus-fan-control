@@ -1,4 +1,8 @@
-"""Run the production session protocol unprivileged against temporary sysfs."""
+"""Use the compiled test executable against temporary sysfs, without pkexec.
+
+Its alternate root and error injection exist only in Go _test.go code, which is
+absent from the production executable installed in the Flatpak.
+"""
 
 from pathlib import Path
 import sys
@@ -6,27 +10,16 @@ import sys
 from fan_control.authorization import AuthorizationSession
 
 ROOT = Path(__file__).resolve().parent.parent
+TEST_HELPER = ROOT / "build/native/fan-control-helper-tests"
 
 
-def fixture_argv(root, idle_seconds=20):
-    # Only test fixtures call serve directly; the production entry requires root
-    # and never accepts an alternative sysfs root from arguments or its protocol.
-    script = f"""
-import sys
-from pathlib import Path
-sys.path.insert(0, {str(ROOT)!r})
-from fan_control.privileged import SysfsControls, serve
-class FixtureControls(SysfsControls):
-    def change(self, operation, value):
-        mode_path = self.root / 'test-command'
-        mode = mode_path.read_text() if mode_path.exists() else 'write'
-        if mode == 'reject':
-            raise ValueError('Fixture rejected the write')
-        if mode != 'ignore':
-            super().change(operation, value)
-serve(FixtureControls(Path({str(root)!r})), idle_seconds={idle_seconds!r})
-"""
-    return [sys.executable, "-I", "-u", "-c", script]
+def fixture_argv(root, idle_seconds=20, mode="session", value=None):
+    argv = [str(TEST_HELPER), "--", mode, str(root)]
+    if mode == "session":
+        argv.append(str(int(idle_seconds * 1000)))
+    elif value is not None:
+        argv.append(value)
+    return argv
 
 
 def fixture_session(root, launched):
