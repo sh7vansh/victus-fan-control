@@ -120,9 +120,34 @@ class PowerProfilesSyncTests(unittest.TestCase):
             FanWindow.complete_write(window, request, "Balanced applied")
         self.assertTrue(window.busy)
         window.hardware.profile = "performance"
-        sync.call_args.kwargs["finished"](None)
+        # A mismatch that outlasts the settling deadline is still a failure.
+        with patch("fan_control.app.GLib.get_monotonic_time", side_effect=[0, 4_000_000]):
+            sync.call_args.kwargs["finished"](None)
         window.fail.assert_called_once()
         window.toast_overlay.add_toast.assert_not_called()
+
+    def test_profile_readback_waits_for_desktop_transition_to_finish(self):
+        from fan_control.app import FanWindow
+        window = self.window()
+        window.busy = True
+        window.hardware = HostHardware()
+        window.hardware.verify_async = MagicMock()
+        request = DemoHardware().profile_request("quiet")
+        with patch("fan_control.app.sync_to_desktop") as sync, \
+             patch("fan_control.app.GLib.timeout_add", return_value=42) as schedule:
+            FanWindow.complete_write(window, request, "Quiet applied")
+            sync.call_args.kwargs["finished"](None)
+            first_readback = window.hardware.verify_async.call_args.args[1]
+            first_readback(ValueError("The setting did not stay applied."))
+            window.fail.assert_not_called()
+            self.assertTrue(window.busy)
+            schedule.assert_called_once()
+            self.assertEqual(schedule.call_args.args[1](), GLib.SOURCE_REMOVE)
+            final_readback = window.hardware.verify_async.call_args.args[1]
+            final_readback(None)
+        self.assertFalse(window.busy)
+        window.fail.assert_not_called()
+        window.toast_overlay.add_toast.assert_called_once()
 
     def test_outgoing_sync_failure_is_visible(self):
         from fan_control.app import FanWindow

@@ -396,8 +396,15 @@ class FanWindow(Adw.ApplicationWindow):
         self.update_authorization()
 
     def complete_write(self, request, message, sync_desktop=True):
+        verify_deadline = None
+
         def verified(error=None):
             if error is not None:
+                if (request.path.name == "platform_profile"
+                        and GLib.get_monotonic_time() < verify_deadline):
+                    # TuneD can acknowledge a mode before its firmware update finishes.
+                    GLib.timeout_add(150, verify)
+                    return
                 self.fail(str(error))
                 return
             self.busy = False
@@ -409,6 +416,9 @@ class FanWindow(Adw.ApplicationWindow):
                 self._on_desktop_profile_change(self.pending_desktop_profile)
 
         def verify():
+            nonlocal verify_deadline
+            if verify_deadline is None:
+                verify_deadline = GLib.get_monotonic_time() + 3_000_000
             if isinstance(self.hardware, HostHardware):
                 self.hardware.verify_async(request, verified)
             else:
@@ -418,6 +428,7 @@ class FanWindow(Adw.ApplicationWindow):
                     verified(error)
                 else:
                     verified()
+            return GLib.SOURCE_REMOVE
 
         def desktop_synced(error):
             self.desktop_write_profile = None

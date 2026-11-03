@@ -38,6 +38,9 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.3" date="2026-11-03">
+      <description><p>Wait for desktop power-mode transitions to finish before reporting a firmware profile mismatch, preventing false failure messages when TuneD applies the requested setting asynchronously.</p></description>
+    </release>
     <release version="1.5.2" date="2026-11-03">
       <description>
         <ul>
