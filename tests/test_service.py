@@ -1,4 +1,5 @@
 import unittest
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -13,10 +14,48 @@ from fan_control.service import (
     service_unit_content,
     installation_script,
     INSTALLED_HELPER,
+    uninstall_service_async,
 )
 
 
 class ServiceTests(unittest.TestCase):
+    def test_uninstall_restores_automatic_before_removing_service(self):
+        for fails in (False, True):
+            with self.subTest(fails=fails), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                mode = root / "mode"
+                mode.write_text("0")
+                helper = root / "bundled helper"
+                helper.write_text(
+                    '#!/bin/sh\n'
+                    '[ "$1" = --restore-automatic ] || exit 9\n'
+                    + ('exit 1\n' if fails else 'printf 2 > "$TEST_MODE"\n')
+                )
+                helper.chmod(0o755)
+                systemctl = root / "systemctl"
+                systemctl.write_text('#!/bin/sh\n[ "$(cat "$TEST_MODE")" = 2 ] || exit 8\n')
+                systemctl.chmod(0o755)
+                installed = root / "installed" / "helper"
+                installed.parent.mkdir()
+                installed.touch()
+                unit = root / "service.unit"
+                unit.touch()
+                socket = root / "service.sock"
+                socket.touch()
+                with patch("fan_control.service.host_helper_path", return_value=helper), \
+                     patch("fan_control.service.INSTALLED_HELPER", installed), \
+                     patch("fan_control.service._run_privileged_script") as run:
+                    uninstall_service_async(Mock(), socket_path=socket, unit_path=unit)
+                result = subprocess.run(
+                    ["/bin/sh", "-c", run.call_args.args[0]],
+                    env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}", "TEST_MODE": str(mode)},
+                    capture_output=True, text=True,
+                )
+                self.assertEqual(result.returncode == 0, not fails, result.stderr)
+                self.assertEqual(mode.read_text(), "0" if fails else "2")
+                for path in (unit, socket, installed):
+                    self.assertEqual(path.exists(), fails)
+
     def test_service_unit_content_contains_daemon_flag_and_helper(self):
         helper = Path("/custom/path/victus-fan-control-helper")
         content = service_unit_content(helper, allowed_uid=1001)

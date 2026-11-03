@@ -30,11 +30,13 @@ Choose **Enable Service**, authenticate, and restart when prompted. Requires sup
 - Toggle maximum fan speed or return to automatic control.
 - Monitor both fans' RPM, refreshed every second.
 
+While the app is open, Quiet, Balanced, and Performance synchronize with the desktop's Power Saver, Balanced, and Performance modes in both directions. Cool is a firmware-only choice and leaves the desktop mode unchanged. Synchronization failures are shown in the app.
+
 **Maximum fan speed stays active after closing.** Turn it off to restore automatic cooling.
 
 On GNOME, the OMEN button opens the app if the key was unassigned. Change it in Settings → Keyboard → Custom Shortcuts.
 
-After updating, choose **Background Service… → Update Service** and restart. Before uninstalling, choose **Disable Service** to remove the host service.
+After updating, choose **Background Service… → Update Service** and restart. Before uninstalling, choose **Disable Service** to restore automatic fan control and remove the host service.
 
 ## Development
 

@@ -106,8 +106,14 @@ def install_service_async(callback, helper_path: Path | None = None, unit_path: 
 
 def uninstall_service_async(callback, socket_path: Path = DAEMON_SOCKET, unit_path: Path = UNIT_PATH):
     quote = shlex.quote
+    try:
+        helper = host_helper_path()
+    except Exception as error:
+        callback(error)
+        return
     script = (
         "set -eu\n"
+        f"{quote(str(helper))} --restore-automatic\n"
         "systemctl disable --now victus-fan-control.service\n"
         f"rm -f -- {quote(str(unit_path))} {quote(str(socket_path))} {quote(str(INSTALLED_HELPER))}\n"
         f"rmdir -- {quote(str(INSTALLED_HELPER.parent))} 2>/dev/null || true\n"

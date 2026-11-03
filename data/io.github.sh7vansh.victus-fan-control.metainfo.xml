@@ -38,6 +38,15 @@
   </keywords>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="1.5.2" date="2026-11-03">
+      <description>
+        <ul>
+          <li>Restore automatic fan control before disabling the background service.</li>
+          <li>Synchronize supported thermal profiles with desktop power modes in both directions, while keeping Cool as a firmware-only choice.</li>
+          <li>Report synchronization failures, verify firmware settings after desktop changes, and prevent accumulating refresh timers.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.5.1" date="2026-10-17">
       <description><p>Consolidate app metadata and host commands, simplify setting readback and packaging, and shorten documentation and comments.</p></description>
     </release>

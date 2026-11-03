@@ -74,6 +74,35 @@ func TestMain(m *testing.M) {
 
 type fixtureControls struct{ controls }
 
+func TestRestoreAutomatic(t *testing.T) {
+	c := fixture(t)
+	if err := c.change("fan", "0"); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"--restore-automatic"}, strings.NewReader(""), io.Discard, c, 1000); err == nil {
+		t.Fatal("Accepted unprivileged reset")
+	}
+	if err := c.verify("fan", "0"); err != nil {
+		t.Fatal("Unprivileged reset changed fan mode:", err)
+	}
+	if err := run([]string{"--restore-automatic"}, strings.NewReader(""), io.Discard, c, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.verify("fan", "2"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(c.controller(), "pwm1_enable")); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"--restore-automatic"}, strings.NewReader(""), io.Discard, c, 0); err == nil {
+		t.Fatal("Ignored missing fan-control attribute")
+	}
+	missing := controls{root: t.TempDir()}
+	if err := run([]string{"--restore-automatic"}, strings.NewReader(""), io.Discard, missing, 0); err != nil {
+		t.Fatal("Absent controller blocked removal:", err)
+	}
+}
+
 func (c fixtureControls) change(operation, value string) error {
 	mode, _ := os.ReadFile(filepath.Join(c.root, "test-command"))
 	if string(mode) == "reject" {

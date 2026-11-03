@@ -76,6 +76,13 @@ class IntegrationApplication(FanApplication):
             elif self.stage == 6:
                 assert w.error_banner.get_revealed() and "did not stay applied" in w.error_detail, repr(w.error_detail)
                 assert w.snapshot.profile == "cool" and w.profile_buttons["cool"].get_active()
+                self.command = "write"
+                w._on_desktop_profile_change("quiet")
+                w._on_desktop_profile_change("performance")
+            elif self.stage == 7:
+                assert w.snapshot.profile == "performance", "Latest desktop mode not applied to firmware"
+                assert w.profile_buttons["performance"].get_active()
+                assert w.desktop_refresh_source == 0, "Desktop refresh timer kept repeating"
                 controller = w.snapshot.controller
                 (controller / "fan1_input").write_text("bad\n")
                 (controller / "fan2_input").unlink()
@@ -86,7 +93,7 @@ class IntegrationApplication(FanApplication):
                 assert all(card.value.get_label() == "—" for card in w.fans)
                 assert not w.maximum.get_sensitive()
                 assert all(not row.get_sensitive() for row in w.profile_rows.values())
-                print("GTK integration passed: async writes, max/auto mapping, external changes, failure, reconnection, readback rejection, and missing hardware", flush=True)
+                print("GTK integration passed: async writes, max/auto mapping, desktop synchronization, external changes, failure, reconnection, readback rejection, and missing hardware", flush=True)
                 w.close()
                 return GLib.SOURCE_REMOVE
             self.stage += 1

@@ -366,6 +366,18 @@ func run(args []string, input io.Reader, output io.Writer, c controls, uid int) 
 		case "--version":
 			_, err := fmt.Fprintln(output, version)
 			return err
+		case "--restore-automatic":
+			if uid != 0 {
+				return errors.New("Administrator authentication is required to restore automatic fan control.")
+			}
+			// Allow removal on systems where the HP controller is no longer present.
+			if c.controller() == "" {
+				return nil
+			}
+			if err := c.change("fan", "2"); err != nil {
+				return err
+			}
+			return c.verify("fan", "2")
 		case "--session":
 			if uid != 0 {
 				return errors.New("Administrator authentication is required for fan changes.")
@@ -396,7 +408,7 @@ func run(args []string, input io.Reader, output io.Writer, c controls, uid int) 
 		}
 		return daemon(defaultSocketPath, c, uint32(allowedUID))
 	}
-	return errors.New("Expected --snapshot, --session, --daemon [--allow-uid UID], --version, --verify-profile VALUE, or --verify-fan VALUE.")
+	return errors.New("Expected --snapshot, --session, --daemon [--allow-uid UID], --restore-automatic, --version, --verify-profile VALUE, or --verify-fan VALUE.")
 }
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout, controls{root: "/sys"}, os.Geteuid()); err != nil {

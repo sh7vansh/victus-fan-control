@@ -30,7 +30,7 @@ The service starts at boot and accepts cooling requests through `/run/victus-fan
 
 The helper accepts four thermal profiles and maximum/automatic fan modes. It discovers sysfs paths itself. Reads and readback run as the user; writes go through the service. The Flatpak locates its bundled helper through `Instance/app-path` in `/.flatpak-info`.
 
-**Update Service** replaces the installed helper. Restart the Flatpak afterward so it sees the new socket. **Disable Service** removes the unit and helper; uninstalling the Flatpak alone leaves them installed. Neither closing the app nor removing the service resets cooling settings.
+**Update Service** replaces the installed helper. Restart the Flatpak afterward so it sees the new socket. **Disable Service** restores and verifies automatic fan control before removing the unit and helper. If restoring automatic control fails, removal stops so you can retry. Removal is also allowed when no HP controller is present. Uninstalling the Flatpak alone leaves the service installed. Closing the app leaves cooling settings applied.
 
 Host reads, service management, and GNOME shortcut setup use `flatpak-spawn --host`. The OMEN shortcut uses `Launch2`, preserves existing assignments, and can be changed in GNOME Settings. It remains after uninstalling the app.
 

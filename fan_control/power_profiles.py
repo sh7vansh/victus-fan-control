@@ -35,20 +35,25 @@ def get_system_bus() -> Gio.DBusConnection | None:
         return None
 
 
-def sync_to_desktop(profile: str, bus: Gio.DBusConnection | None = None) -> None:
+def sync_to_desktop(profile: str, bus: Gio.DBusConnection | None = None,
+                    finished=lambda error: None) -> None:
     gnome_profile = GNOME_POWER_PROFILES.get(profile)
     if not gnome_profile:
+        finished(None)
         return
 
     bus = bus or get_system_bus()
     if bus is None:
+        finished(ValueError("Cannot connect to the desktop power-profile service."))
         return
 
     def on_called(conn, res, *_user_data):
         try:
             conn.call_finish(res)
-        except Exception:
-            pass
+        except Exception as error:
+            finished(error)
+        else:
+            finished(None)
 
     try:
         bus.call(
@@ -63,12 +68,12 @@ def sync_to_desktop(profile: str, bus: Gio.DBusConnection | None = None) -> None
             )),
             None,
             Gio.DBusCallFlags.NONE,
-            -1,
+            3000,
             None,
             on_called,
         )
-    except Exception:
-        pass
+    except Exception as error:
+        finished(error)
 
 
 def subscribe_desktop_changes(callback, bus: Gio.DBusConnection | None = None) -> int | None:

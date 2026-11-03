@@ -117,7 +117,8 @@ fixture.setUp()
 try:
     app = HostApplication(fixture)
     # Fixture HostHardware must never change the real desktop power profile.
-    with patch("fan_control.app.sync_to_desktop"), patch("fan_control.app.subscribe_desktop_changes"):
+    with patch("fan_control.app.sync_to_desktop", side_effect=lambda profile, finished: finished(None)), \
+         patch("fan_control.app.subscribe_desktop_changes", return_value=None):
         result = app.run([sys.argv[0]])
 finally:
     if hasattr(app, "window"):

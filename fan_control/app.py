@@ -102,6 +102,10 @@ class FanWindow(Adw.ApplicationWindow):
         self.service_action.set_enabled(not isinstance(hardware, DemoHardware))
         self.add_action(self.service_action)
         self.desktop_sync_id = None
+        self.desktop_refresh_source = 0
+        self.pending_desktop_profile = None
+        self.desktop_write_profile = None
+        self.closing = False
         if is_live_hardware(hardware):
             self.desktop_sync_id = subscribe_desktop_changes(self._on_desktop_profile_change)
         self.connect("close-request", self.on_close)
@@ -276,7 +280,10 @@ class FanWindow(Adw.ApplicationWindow):
             return
         self.begin_write(request, "Max fan speed enabled" if row.get_active() else "Automatic fan control restored")
 
-    def begin_write(self, request, success_message):
+    def begin_write(self, request, success_message, sync_desktop=True):
+        if sync_desktop and request.path.name == "platform_profile":
+            # A new choice in this window supersedes an earlier desktop change.
+            self.pending_desktop_profile = None
         # Show the last known hardware state until the write succeeds.
         self.refresh()
         self.busy = True
@@ -290,7 +297,7 @@ class FanWindow(Adw.ApplicationWindow):
         if isinstance(self.hardware, DemoHardware):
             def apply_demo():
                 self.hardware.apply(request)
-                self.complete_write(request, success_message)
+                self.complete_write(request, success_message, sync_desktop)
                 return GLib.SOURCE_REMOVE
             GLib.timeout_add(180, apply_demo)
             return
@@ -298,7 +305,7 @@ class FanWindow(Adw.ApplicationWindow):
             if error is not None:
                 self.fail(str(error))
             else:
-                GLib.timeout_add(250, self.complete_write, request, success_message)
+                GLib.timeout_add(250, self.complete_write, request, success_message, sync_desktop)
         self.authorization.change(request, written)
 
     def update_authorization(self):
@@ -388,7 +395,7 @@ class FanWindow(Adw.ApplicationWindow):
             self.authorization.close()
         self.update_authorization()
 
-    def complete_write(self, request, message):
+    def complete_write(self, request, message, sync_desktop=True):
         def verified(error=None):
             if error is not None:
                 self.fail(str(error))
@@ -398,22 +405,73 @@ class FanWindow(Adw.ApplicationWindow):
             self.spinner.set_spinning(False)
             self.refresh()
             self.toast_overlay.add_toast(Adw.Toast(title=message))
-            if is_live_hardware(self.hardware) and request.path.name == "platform_profile":
-                sync_to_desktop(request.value)
+            if self.pending_desktop_profile is not None:
+                self._on_desktop_profile_change(self.pending_desktop_profile)
 
-        if isinstance(self.hardware, HostHardware):
-            self.hardware.verify_async(request, verified)
-        else:
-            try:
-                self.hardware.verify(request)
-            except ValueError as error:
-                verified(error)
+        def verify():
+            if isinstance(self.hardware, HostHardware):
+                self.hardware.verify_async(request, verified)
             else:
-                verified()
+                try:
+                    self.hardware.verify(request)
+                except ValueError as error:
+                    verified(error)
+                else:
+                    verified()
+
+        def desktop_synced(error):
+            self.desktop_write_profile = None
+            if error is not None:
+                self.fail(f"The firmware setting was applied, but desktop power-profile synchronization failed: {error}")
+                return
+            # The desktop power service can also change firmware settings.
+            verify()
+
+        if (sync_desktop and is_live_hardware(self.hardware)
+                and request.path.name == "platform_profile"
+                and self.pending_desktop_profile in (None, request.value)):
+            self.desktop_write_profile = request.value
+            sync_to_desktop(request.value, finished=desktop_synced)
+        else:
+            verify()
         return GLib.SOURCE_REMOVE
 
-    def _on_desktop_profile_change(self, _firmware_profile):
-        GLib.timeout_add(150, self.refresh)
+    def _on_desktop_profile_change(self, firmware_profile):
+        if self.closing or firmware_profile is None or firmware_profile == self.desktop_write_profile:
+            return
+        self.pending_desktop_profile = firmware_profile
+        if self.desktop_refresh_source:
+            return
+
+        def refresh_once():
+            self.desktop_refresh_source = 0
+            self._apply_desktop_profile()
+            return GLib.SOURCE_REMOVE
+
+        self.desktop_refresh_source = GLib.timeout_add(150, refresh_once)
+
+    def _apply_desktop_profile(self, poll=True):
+        if self.closing or self.busy:
+            return
+        profile = self.pending_desktop_profile
+        if profile is None:
+            return
+        if isinstance(self.hardware, HostHardware) and poll:
+            if self.hardware.pending:
+                self._on_desktop_profile_change(profile)
+            else:
+                self.hardware.poll(lambda: self._apply_desktop_profile(False))
+            return
+        self.pending_desktop_profile = None
+        if self.hardware.read().profile == profile:
+            self.refresh()
+            return
+        try:
+            request = self.hardware.profile_request(profile)
+        except ValueError as error:
+            self.fail(f"Cannot synchronize the desktop power mode with the firmware: {error}")
+            return
+        self.begin_write(request, f"{PROFILES[profile][0]} profile applied", sync_desktop=False)
 
     def fail(self, detail):
         self.busy = False
@@ -422,6 +480,8 @@ class FanWindow(Adw.ApplicationWindow):
         self.error_detail = detail
         self.error_banner.set_revealed(True)
         self.refresh()
+        if self.pending_desktop_profile is not None:
+            self._on_desktop_profile_change(self.pending_desktop_profile)
 
     def show_error(self, _banner):
         dialog = Adw.AlertDialog(heading="Could not apply setting", body=self.error_detail)
@@ -441,7 +501,11 @@ class FanWindow(Adw.ApplicationWindow):
         if self.busy:
             self.toast_overlay.add_toast(Adw.Toast(title="Finish or cancel authentication before closing"))
             return True
+        self.closing = True
         GLib.source_remove(self.poll_source)
+        if self.desktop_refresh_source:
+            GLib.source_remove(self.desktop_refresh_source)
+            self.desktop_refresh_source = 0
         if self.desktop_sync_id is not None:
             unsubscribe_desktop_changes(self.desktop_sync_id)
             self.desktop_sync_id = None
